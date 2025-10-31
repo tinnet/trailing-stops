@@ -28,10 +28,15 @@ class StopLossResult:
     currency: str
     dollar_risk: float  # Amount at risk per share
     sma_50: float | None = None  # 50-day simple moving average (for display only)
+    atr_value: float | None = None  # ATR value (for ATR mode display)
+    atr_multiplier: float | None = None  # ATR multiplier (for ATR mode display)
 
     @property
     def formatted_percentage(self) -> str:
         """Get formatted percentage string."""
+        if self.stop_loss_type == StopLossType.ATR and self.atr_value is not None:
+            # For ATR mode, show multiplier and ATR value
+            return f"{self.atr_multiplier:.1f}× ({self.currency} {self.atr_value:.2f} ATR)"
         return f"{self.percentage:.2f}%"
 
     @property
@@ -240,7 +245,7 @@ class StopLossCalculator:
 
         Args:
             stock_price: Current stock price information.
-            percentage: Stop-loss percentage (used for display, not calculation).
+            percentage: Stop-loss percentage (not used in calculation, for compatibility).
             atr: Average True Range value.
             atr_multiplier: Multiplier for ATR (default 2.0).
             sma_50: Optional 50-day simple moving average (for display only).
@@ -262,8 +267,10 @@ class StopLossCalculator:
             current_price=stock_price.current_price,
             stop_loss_price=stop_loss_price,
             stop_loss_type=StopLossType.ATR,
-            percentage=percentage,  # For display compatibility
+            percentage=percentage,  # Not used in ATR mode
             currency=stock_price.currency,
             dollar_risk=dollar_risk,
             sma_50=sma_50,
+            atr_value=atr,
+            atr_multiplier=atr_multiplier,
         )
