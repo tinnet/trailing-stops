@@ -1,0 +1,19 @@
+# Trailing Stop-Loss Configuration
+
+# List of ticker symbols to track
+tickers = [
+    "AAPL",
+    "AMD",
+    "SHOP.TO",
+    "NVDA",
+    "EUAD",
+]
+
+# Default stop-loss percentage (0-100)
+# This is the percentage below the current price (simple) or high-water mark (trailing)
+stop_loss_percentage = 5.0
+
+# Enable trailing stop-loss by default
+# If true, stop-loss will track the highest price seen
+# If false, stop-loss is calculated from current price only
+trailing_enabled = false
