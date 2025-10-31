@@ -1,8 +1,9 @@
 """Stock price fetching using yfinance."""
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
+import pandas as pd
 import yfinance as yf
 
 
@@ -96,3 +97,43 @@ class PriceFetcher:
     def clear_cache(self) -> None:
         """Clear the price cache."""
         self._cache.clear()
+
+    def fetch_historical_data(
+        self, ticker: str, start_date: date | str | None = None, end_date: date | str | None = None
+    ) -> pd.DataFrame:
+        """Fetch historical OHLC data for a ticker.
+
+        Args:
+            ticker: Stock ticker symbol.
+            start_date: Start date for historical data. Defaults to 3 months ago.
+            end_date: End date for historical data. Defaults to today.
+
+        Returns:
+            DataFrame with columns: Open, High, Low, Close, Volume and DatetimeIndex.
+
+        Raises:
+            ValueError: If ticker is invalid or data cannot be fetched.
+        """
+        try:
+            stock = yf.Ticker(ticker)
+
+            # Set default dates if not provided
+            if start_date is None:
+                start_date = (datetime.now() - timedelta(days=90)).date()
+            if end_date is None:
+                end_date = datetime.now().date()
+
+            # Convert to string format expected by yfinance
+            start_str = start_date if isinstance(start_date, str) else start_date.strftime("%Y-%m-%d")
+            end_str = end_date if isinstance(end_date, str) else end_date.strftime("%Y-%m-%d")
+
+            # Fetch historical data
+            history = stock.history(start=start_str, end=end_str)
+
+            if history.empty:
+                raise ValueError(f"No historical data available for {ticker}")
+
+            return history
+
+        except Exception as e:
+            raise ValueError(f"Failed to fetch historical data for {ticker}: {e}") from e

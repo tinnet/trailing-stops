@@ -6,7 +6,6 @@ tickers = [
     "AMD",
     "SHOP.TO",
     "NVDA",
-    "EUAD",
 ]
 
 # Default stop-loss percentage (0-100)
@@ -14,6 +13,13 @@ tickers = [
 stop_loss_percentage = 5.0
 
 # Enable trailing stop-loss by default
-# If true, stop-loss will track the highest price seen
+# If true, stop-loss will track the highest price seen from historical data
 # If false, stop-loss is calculated from current price only
 trailing_enabled = false
+
+# Optional: Specify buy dates for specific tickers (for trailing mode)
+# The tool will fetch historical data starting from these dates
+# Format: YYYY-MM-DD
+# [buy_dates]
+# AAPL = "2024-01-15"
+# AMD = "2024-06-01"

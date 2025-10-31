@@ -104,6 +104,20 @@ uv run stop-loss calculate --config /path/to/config.toml
 uv run stop-loss calculate -c custom-config.toml
 ```
 
+### Advanced Options
+
+Calculate from a specific date (useful if you bought at a known date):
+
+```bash
+uv run stop-loss calculate --trailing --since 2024-01-15
+```
+
+Skip historical data fetching (use only in-memory tracking):
+
+```bash
+uv run stop-loss calculate --trailing --no-history
+```
+
 ### Version Info
 
 ```bash
@@ -159,11 +173,15 @@ trailing-stop-loss/
 │       ├── cli.py            # Typer CLI interface
 │       ├── config.py         # TOML configuration loader
 │       ├── fetcher.py        # yfinance price fetching
-│       └── calculator.py     # Stop-loss calculation logic
+│       ├── calculator.py     # Stop-loss calculation logic
+│       └── history.py        # SQLite price history database
 ├── tests/
 │   ├── test_config.py        # Config tests
 │   ├── test_fetcher.py       # Fetcher tests (integration)
-│   └── test_calculator.py    # Calculator tests
+│   ├── test_calculator.py    # Calculator tests
+│   └── test_history.py       # History database tests
+├── .data/                    # SQLite database (gitignored)
+│   └── price_history.db      # Historical OHLC data
 ├── config.toml               # Configuration file
 ├── pyproject.toml            # Project metadata and dependencies
 └── .python-version           # Python version for mise
@@ -184,16 +202,26 @@ Example: If AAPL is at $150 USD with 5% stop-loss:
 
 ### Trailing Stop-Loss
 
-Tracks the highest price seen (high-water mark) and calculates stop-loss from that:
+Tracks the highest price seen (high-water mark) from historical data and calculates stop-loss from that:
 
 ```
 Stop-Loss Price = High-Water Mark × (1 - Percentage / 100)
 ```
 
-Example: If SHOP.TO goes from $80 CAD → $90 CAD → $85 CAD with 5% trailing stop:
-- At $80: Stop-Loss = $76.00 CAD
-- At $90: Stop-Loss = $85.50 CAD (tracks new high)
-- At $85: Stop-Loss = $85.50 CAD (stays at high-water mark)
+**How it works:**
+1. First run: Fetches 3 months of historical OHLC data from yfinance
+2. Stores data in SQLite database (`.data/price_history.db`)
+3. Finds the maximum high price since you started tracking
+4. Subsequent runs: Only fetches new data since last update
+5. Current price is appended to history on each run
+
+**Example:** If AMD went from $220 → $267 → $255 over 3 months with 5% trailing stop:
+- Historical High: $267
+- Current Price: $255
+- Stop-Loss: $267 × 0.95 = $253.65 (only $1.35 at risk!)
+- Simple mode would give: $255 × 0.95 = $242.25 ($12.75 at risk)
+
+The trailing mode protects your gains by locking in profits as the price rises.
 
 ### Currency Handling
 

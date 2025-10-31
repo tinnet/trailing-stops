@@ -72,5 +72,4 @@ pyrightconfig.json
 
 # Project specific
 *.log
-*.db
-*.sqlite3
+.data/

@@ -1,5 +1,6 @@
 """Beautiful CLI interface using typer and rich."""
 
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Annotated
 
@@ -10,6 +11,7 @@ from rich.table import Table
 from trailing_stop_loss.calculator import StopLossCalculator
 from trailing_stop_loss.config import Config
 from trailing_stop_loss.fetcher import PriceFetcher, StockPrice
+from trailing_stop_loss.history import PriceHistoryDB
 
 app = typer.Typer(
     name="stop-loss",
@@ -84,14 +86,23 @@ def calculate(
             "--trailing/--simple", "-t/-s", help="Use trailing stop-loss (overrides config)"
         ),
     ] = None,
+    since: Annotated[
+        str | None,
+        typer.Option("--since", help="Start date for trailing calculation (YYYY-MM-DD)"),
+    ] = None,
+    no_history: Annotated[
+        bool,
+        typer.Option("--no-history", help="Skip historical data fetching"),
+    ] = False,
 ) -> None:
     """Calculate stop-loss prices for configured tickers.
 
     Examples:
-        stop-loss calculate
-        stop-loss calculate AAPL GOOGL MSFT
-        stop-loss calculate --percentage 7.5 --trailing
-        stop-loss calculate TSLA -p 10 --simple
+        uv run stop-loss calculate
+        uv run stop-loss calculate AAPL GOOGL MSFT
+        uv run stop-loss calculate --percentage 7.5 --trailing
+        uv run stop-loss calculate TSLA -p 10 --simple
+        uv run stop-loss calculate --trailing --since 2024-01-01
     """
     try:
         # Load configuration
@@ -111,13 +122,61 @@ def calculate(
         # Determine trailing mode
         use_trailing = trailing if trailing is not None else config.trailing_enabled
 
+        # Parse since date if provided
+        since_date: date | None = None
+        if since:
+            try:
+                since_date = datetime.strptime(since, "%Y-%m-%d").date()
+            except ValueError:
+                console.print(f"[red]Invalid date format: {since}. Use YYYY-MM-DD[/red]")
+                raise typer.Exit(1)
+
         # Initialize components
         fetcher = PriceFetcher()
         calculator = StopLossCalculator()
+        history_db = PriceHistoryDB() if not no_history else None
 
-        # Fetch prices
-        console.print(f"[cyan]Fetching prices for {len(ticker_list)} ticker(s)...[/cyan]")
+        # Fetch historical data if using trailing mode and history is enabled
+        if use_trailing and history_db:
+            console.print("[cyan]Updating historical price data...[/cyan]")
+            for ticker in ticker_list:
+                try:
+                    # Check if we have data
+                    last_update = history_db.get_last_update_date(ticker)
+                    if last_update:
+                        # Fetch only new data since last update
+                        start_date = last_update + timedelta(days=1)
+                        if start_date <= date.today():
+                            hist_data = fetcher.fetch_historical_data(
+                                ticker, start_date=start_date
+                            )
+                            rows = history_db.store_history(ticker, hist_data)
+                            if rows > 0:
+                                console.print(
+                                    f"  [dim]Added {rows} new data points for {ticker}[/dim]"
+                                )
+                    else:
+                        # First time fetching - get 3 months of data or from since_date
+                        start = since_date or (date.today() - timedelta(days=90))
+                        hist_data = fetcher.fetch_historical_data(ticker, start_date=start)
+                        rows = history_db.store_history(ticker, hist_data)
+                        console.print(
+                            f"  [dim]Stored {rows} historical data points for {ticker}[/dim]"
+                        )
+                except Exception as e:
+                    console.print(f"  [yellow]Warning: Could not fetch history for {ticker}: {e}[/yellow]")
+
+        # Fetch current prices
+        console.print(f"[cyan]Fetching current prices for {len(ticker_list)} ticker(s)...[/cyan]")
         price_results = fetcher.fetch_multiple(ticker_list, skip_errors=True)
+
+        # Store current prices in history if enabled
+        if history_db:
+            for ticker, price_or_error in price_results.items():
+                if not isinstance(price_or_error, Exception):
+                    history_db.store_current_price(
+                        ticker, price_or_error.current_price, price_or_error.timestamp
+                    )
 
         # Calculate stop-losses
         results: list[tuple[StockPrice | str, object]] = []
@@ -126,7 +185,14 @@ def calculate(
                 results.append((ticker, price_or_error))
             else:
                 try:
-                    stop_loss = calculator.calculate(price_or_error, pct, use_trailing)
+                    # Get high water mark from DB if trailing mode
+                    hwm = None
+                    if use_trailing and history_db:
+                        hwm = history_db.get_high_water_mark(ticker, since_date)
+
+                    stop_loss = calculator.calculate(
+                        price_or_error, pct, use_trailing, high_water_mark=hwm
+                    )
                     results.append((price_or_error, stop_loss))
                 except Exception as e:
                     results.append((price_or_error, e))

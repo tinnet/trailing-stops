@@ -72,12 +72,16 @@ class StopLossCalculator:
             dollar_risk=dollar_risk,
         )
 
-    def calculate_trailing(self, stock_price: StockPrice, percentage: float) -> StopLossResult:
+    def calculate_trailing(
+        self, stock_price: StockPrice, percentage: float, high_water_mark: float | None = None
+    ) -> StopLossResult:
         """Calculate trailing stop-loss (tracks high water mark).
 
         Args:
             stock_price: Current stock price information.
             percentage: Stop-loss percentage (0-100).
+            high_water_mark: Optional pre-calculated high water mark. If None,
+                           uses in-memory tracking (legacy behavior).
 
         Returns:
             StopLossResult with calculated trailing stop-loss price.
@@ -88,17 +92,22 @@ class StopLossCalculator:
         if not 0 < percentage < 100:
             raise ValueError(f"Percentage must be between 0 and 100, got {percentage}")
 
-        # Update high water mark if current price is higher
-        ticker = stock_price.ticker
-        if ticker not in self._high_water_marks:
-            self._high_water_marks[ticker] = stock_price.current_price
+        # Use provided high water mark, or fall back to in-memory tracking
+        if high_water_mark is not None:
+            # Use the provided high water mark (from database)
+            hwm = high_water_mark
         else:
-            self._high_water_marks[ticker] = max(
-                self._high_water_marks[ticker], stock_price.current_price
-            )
+            # Legacy in-memory tracking
+            ticker = stock_price.ticker
+            if ticker not in self._high_water_marks:
+                self._high_water_marks[ticker] = stock_price.current_price
+            else:
+                self._high_water_marks[ticker] = max(
+                    self._high_water_marks[ticker], stock_price.current_price
+                )
+            hwm = self._high_water_marks[ticker]
 
-        high_water_mark = self._high_water_marks[ticker]
-        stop_loss_price = high_water_mark * (1 - percentage / 100)
+        stop_loss_price = hwm * (1 - percentage / 100)
         dollar_risk = stock_price.current_price - stop_loss_price
 
         return StopLossResult(
@@ -112,7 +121,11 @@ class StopLossCalculator:
         )
 
     def calculate(
-        self, stock_price: StockPrice, percentage: float, trailing: bool = False
+        self,
+        stock_price: StockPrice,
+        percentage: float,
+        trailing: bool = False,
+        high_water_mark: float | None = None,
     ) -> StopLossResult:
         """Calculate stop-loss price.
 
@@ -120,12 +133,13 @@ class StopLossCalculator:
             stock_price: Current stock price information.
             percentage: Stop-loss percentage (0-100).
             trailing: Whether to use trailing stop-loss.
+            high_water_mark: Optional high water mark for trailing mode.
 
         Returns:
             StopLossResult with calculated stop-loss price.
         """
         if trailing:
-            return self.calculate_trailing(stock_price, percentage)
+            return self.calculate_trailing(stock_price, percentage, high_water_mark)
         else:
             return self.calculate_simple(stock_price, percentage)
 
