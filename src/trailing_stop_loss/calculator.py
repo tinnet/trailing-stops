@@ -32,6 +32,21 @@ class StopLossResult:
     atr_multiplier: float | None = None  # ATR multiplier (for ATR mode display)
 
     @property
+    def formatted_guidance(self) -> str:
+        """Get guidance on whether to update stop-loss based on SMA.
+
+        Uses 50-day SMA as a sanity check:
+        - If stop < SMA: Price above support, raise stop to lock gains
+        - If stop > SMA: Stop is appropriately positioned, keep current
+        """
+        if self.sma_50 is None:
+            return "N/A"
+        elif self.stop_loss_price < self.sma_50:
+            return "Raise stop"
+        else:
+            return "Keep current"
+
+    @property
     def formatted_percentage(self) -> str:
         """Get formatted percentage string."""
         if self.stop_loss_type == StopLossType.ATR and self.atr_value is not None:

@@ -39,6 +39,7 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
     table.add_column("Type", justify="center")
     table.add_column("Stop Method", justify="right")
     table.add_column("Risk/Share", justify="right")
+    table.add_column("Guidance", justify="center")
 
     for stock_price, result in results:
         from trailing_stop_loss.calculator import StopLossResult
@@ -52,6 +53,7 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
                 "[red]N/A[/red]",
                 "[red]N/A[/red]",
                 f"[red]{str(result)[:30]}[/red]",
+                "[red]N/A[/red]",
             )
         elif isinstance(result, StopLossResult):
             if result.stop_loss_type.value == "trailing":
@@ -63,6 +65,14 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
 
             price_color = "green" if result.current_price > result.stop_loss_price else "red"
 
+            # Color code guidance
+            if result.formatted_guidance == "Raise stop":
+                guidance_str = f"[yellow]{result.formatted_guidance}[/yellow]"
+            elif result.formatted_guidance == "Keep current":
+                guidance_str = f"[green]{result.formatted_guidance}[/green]"
+            else:
+                guidance_str = result.formatted_guidance
+
             table.add_row(
                 result.ticker,
                 f"{result.currency} {result.current_price:.2f}",
@@ -71,6 +81,7 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
                 type_str,
                 result.formatted_percentage,
                 result.formatted_risk,
+                guidance_str,
             )
 
     return table
