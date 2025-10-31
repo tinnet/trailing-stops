@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+import pandas as pd
 import pytest
 
 from trailing_stop_loss.calculator import StopLossCalculator, StopLossType
@@ -129,3 +130,87 @@ def test_formatted_output(calculator: StopLossCalculator, sample_stock_price: St
 
     assert result.formatted_percentage == "5.00%"
     assert result.formatted_risk == "USD 7.50"
+
+
+def test_calculate_atr() -> None:
+    """Test ATR calculation with known data."""
+    # Create test data with known True Range values
+    data = {
+        "High": [105.0, 107.0, 106.0, 108.0, 110.0, 109.0, 111.0, 112.0, 113.0, 114.0,
+                 115.0, 116.0, 117.0, 118.0, 119.0],
+        "Low": [99.0, 101.0, 100.0, 102.0, 104.0, 103.0, 105.0, 106.0, 107.0, 108.0,
+                109.0, 110.0, 111.0, 112.0, 113.0],
+        "Close": [103.0, 105.0, 104.0, 106.0, 108.0, 107.0, 109.0, 110.0, 111.0, 112.0,
+                  113.0, 114.0, 115.0, 116.0, 117.0],
+    }
+    dates = pd.date_range("2024-01-01", periods=15)
+    df = pd.DataFrame(data, index=dates)
+
+    atr = StopLossCalculator.calculate_atr(df, period=14)
+
+    # ATR should be positive
+    assert atr > 0
+    # For this data, ATR should be reasonable
+    assert 4.0 < atr < 8.0
+
+
+def test_calculate_atr_insufficient_data() -> None:
+    """Test ATR calculation with insufficient data."""
+    data = {
+        "High": [105.0, 107.0],
+        "Low": [99.0, 101.0],
+        "Close": [103.0, 105.0],
+    }
+    dates = pd.date_range("2024-01-01", periods=2)
+    df = pd.DataFrame(data, index=dates)
+
+    with pytest.raises(ValueError, match="Insufficient data"):
+        StopLossCalculator.calculate_atr(df, period=14)
+
+
+def test_calculate_atr_missing_columns() -> None:
+    """Test ATR calculation with missing columns."""
+    data = {
+        "High": [105.0, 107.0, 106.0],
+        "Low": [99.0, 101.0, 100.0],
+        # Missing Close column
+    }
+    dates = pd.date_range("2024-01-01", periods=3)
+    df = pd.DataFrame(data, index=dates)
+
+    with pytest.raises(ValueError, match="Missing required columns"):
+        StopLossCalculator.calculate_atr(df, period=2)
+
+
+def test_calculate_atr_stop_loss(
+    calculator: StopLossCalculator, sample_stock_price: StockPrice
+) -> None:
+    """Test ATR-based stop-loss calculation."""
+    atr = 10.0  # $10 ATR
+    result = calculator.calculate_atr_stop_loss(sample_stock_price, 5.0, atr, atr_multiplier=2.0)
+
+    # Stop-loss should be current price - (ATR × multiplier)
+    expected_stop = 150.0 - (10.0 * 2.0)
+    assert result.stop_loss_price == pytest.approx(expected_stop)
+    assert result.stop_loss_type == StopLossType.ATR
+    assert result.dollar_risk == pytest.approx(20.0)
+
+
+def test_calculate_atr_stop_loss_different_multiplier(
+    calculator: StopLossCalculator, sample_stock_price: StockPrice
+) -> None:
+    """Test ATR stop-loss with different multiplier."""
+    atr = 10.0
+    result = calculator.calculate_atr_stop_loss(sample_stock_price, 5.0, atr, atr_multiplier=1.5)
+
+    expected_stop = 150.0 - (10.0 * 1.5)
+    assert result.stop_loss_price == pytest.approx(expected_stop)
+    assert result.dollar_risk == pytest.approx(15.0)
+
+
+def test_calculate_atr_stop_loss_invalid_multiplier(
+    calculator: StopLossCalculator, sample_stock_price: StockPrice
+) -> None:
+    """Test ATR stop-loss with invalid multiplier."""
+    with pytest.raises(ValueError, match="ATR multiplier must be positive"):
+        calculator.calculate_atr_stop_loss(sample_stock_price, 5.0, 10.0, atr_multiplier=0.0)

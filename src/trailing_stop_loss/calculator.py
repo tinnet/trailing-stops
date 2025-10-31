@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 from enum import Enum
 
+import pandas as pd
+
 from trailing_stop_loss.fetcher import StockPrice
 
 
@@ -11,6 +13,7 @@ class StopLossType(Enum):
 
     SIMPLE = "simple"
     TRAILING = "trailing"
+    ATR = "atr"
 
 
 @dataclass
@@ -164,3 +167,82 @@ class StopLossCalculator:
             High water mark price or None if not set.
         """
         return self._high_water_marks.get(ticker)
+
+    @staticmethod
+    def calculate_atr(history_df: pd.DataFrame, period: int = 14) -> float:
+        """Calculate Average True Range from historical data.
+
+        Args:
+            history_df: DataFrame with High, Low, Close columns and DatetimeIndex.
+            period: Number of periods for ATR calculation (default 14).
+
+        Returns:
+            Average True Range value.
+
+        Raises:
+            ValueError: If insufficient data or required columns missing.
+        """
+        if len(history_df) < period:
+            raise ValueError(f"Insufficient data: need {period} periods, got {len(history_df)}")
+
+        required_cols = ["High", "Low", "Close"]
+        missing = [col for col in required_cols if col not in history_df.columns]
+        if missing:
+            raise ValueError(f"Missing required columns: {missing}")
+
+        # Calculate True Range components
+        high = history_df["High"]
+        low = history_df["Low"]
+        prev_close = history_df["Close"].shift(1)
+
+        tr1 = high - low  # High - Low
+        tr2 = abs(high - prev_close)  # |High - Previous Close|
+        tr3 = abs(low - prev_close)  # |Low - Previous Close|
+
+        # True Range is the maximum of the three
+        true_range = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+
+        # ATR is the moving average of True Range
+        atr = true_range.rolling(window=period).mean().iloc[-1]
+
+        if pd.isna(atr):
+            raise ValueError("ATR calculation resulted in NaN")
+
+        return float(atr)
+
+    def calculate_atr_stop_loss(
+        self,
+        stock_price: StockPrice,
+        percentage: float,
+        atr: float,
+        atr_multiplier: float = 2.0,
+    ) -> StopLossResult:
+        """Calculate ATR-based stop-loss.
+
+        Args:
+            stock_price: Current stock price information.
+            percentage: Stop-loss percentage (used for display, not calculation).
+            atr: Average True Range value.
+            atr_multiplier: Multiplier for ATR (default 2.0).
+
+        Returns:
+            StopLossResult with calculated ATR-based stop-loss price.
+
+        Raises:
+            ValueError: If atr_multiplier is invalid.
+        """
+        if atr_multiplier <= 0:
+            raise ValueError(f"ATR multiplier must be positive, got {atr_multiplier}")
+
+        stop_loss_price = stock_price.current_price - (atr * atr_multiplier)
+        dollar_risk = stock_price.current_price - stop_loss_price
+
+        return StopLossResult(
+            ticker=stock_price.ticker,
+            current_price=stock_price.current_price,
+            stop_loss_price=stop_loss_price,
+            stop_loss_type=StopLossType.ATR,
+            percentage=percentage,  # For display compatibility
+            currency=stock_price.currency,
+            dollar_risk=dollar_risk,
+        )

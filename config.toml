@@ -23,3 +23,8 @@ trailing_enabled = false
 # [buy_dates]
 # AAPL = "2024-01-15"
 # AMD = "2024-06-01"
+
+# ATR (Average True Range) Configuration
+# ATR adapts stop-loss to each stock's volatility
+# atr_period = 14  # Number of days for ATR calculation (industry standard)
+# atr_multiplier = 2.0  # Multiplier for stop-loss distance (1.5=tight, 2.0=normal, 3.0=loose)

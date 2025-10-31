@@ -222,3 +222,45 @@ class PriceHistoryDB:
             cursor = conn.execute(query, params)
             columns = ["ticker", "date", "open", "high", "low", "close", "volume"]
             return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    def get_recent_history_df(self, ticker: str, days: int = 14) -> pd.DataFrame:
+        """Get recent historical data as a pandas DataFrame for calculations.
+
+        Args:
+            ticker: Stock ticker symbol.
+            days: Number of most recent days to retrieve.
+
+        Returns:
+            DataFrame with columns: Open, High, Low, Close, Volume and date index.
+
+        Raises:
+            ValueError: If no data exists for ticker.
+        """
+        query = """
+            SELECT date, open, high, low, close, volume
+            FROM price_history
+            WHERE ticker = ?
+            ORDER BY date DESC
+            LIMIT ?
+        """
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(query, (ticker.upper(), days))
+            rows = cursor.fetchall()
+
+            if not rows:
+                raise ValueError(f"No historical data found for {ticker}")
+
+            # Convert to DataFrame
+            df = pd.DataFrame(
+                rows, columns=["date", "Open", "High", "Low", "Close", "Volume"]
+            )
+
+            # Convert date column to datetime and set as index
+            df["date"] = pd.to_datetime(df["date"])
+            df = df.set_index("date")
+
+            # Sort by date ascending (oldest first) for calculations
+            df = df.sort_index()
+
+            return df

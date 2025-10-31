@@ -6,6 +6,7 @@ Calculate stop-loss prices for stock positions with a beautiful CLI interface.
 
 - **Simple Stop-Loss**: Calculate stop-loss as a percentage below current price
 - **Trailing Stop-Loss**: Track high-water marks and adjust stop-loss dynamically
+- **ATR-Based Stop-Loss**: Volatility-adaptive stop-loss using Average True Range
 - **Beautiful CLI**: Rich table output with color-coded results using `typer` and `rich`
 - **Multi-Currency Support**: Automatically handles USD, CAD, and other currencies
 - **TOML Configuration**: Easy configuration for default tickers and settings
@@ -84,7 +85,31 @@ uv run stop-loss calculate --trailing
 uv run stop-loss calculate -t
 ```
 
-Or use simple stop-loss explicitly:
+### ATR-Based Stop-Loss
+
+Use ATR (Average True Range) for volatility-adaptive stop-loss:
+
+```bash
+uv run stop-loss calculate --atr
+uv run stop-loss calculate -a
+```
+
+Customize ATR parameters:
+
+```bash
+# Use tighter stop (1.5× ATR)
+uv run stop-loss calculate --atr --atr-multiplier 1.5
+
+# Use looser stop (3× ATR)
+uv run stop-loss calculate --atr --atr-multiplier 3.0
+
+# Change ATR period (default 14 days)
+uv run stop-loss calculate --atr --atr-period 20
+```
+
+### Simple Stop-Loss
+
+Use simple stop-loss explicitly:
 
 ```bash
 uv run stop-loss calculate --simple
@@ -222,6 +247,36 @@ Stop-Loss Price = High-Water Mark × (1 - Percentage / 100)
 - Simple mode would give: $255 × 0.95 = $242.25 ($12.75 at risk)
 
 The trailing mode protects your gains by locking in profits as the price rises.
+
+### ATR-Based Stop-Loss
+
+Uses Average True Range (ATR) to adapt stop-loss distance to each stock's volatility:
+
+```
+ATR = 14-day moving average of True Range
+True Range = max(High-Low, |High-PrevClose|, |Low-PrevClose|)
+Stop-Loss Price = Current Price - (ATR × Multiplier)
+```
+
+**How it works:**
+1. Fetches historical OHLC data (same as trailing mode)
+2. Calculates True Range for each day (captures daily volatility)
+3. Takes 14-day moving average of True Range = ATR
+4. Stop-loss is placed at Current Price - (ATR × Multiplier)
+
+**Example:** AMD at $254.84 with ATR = $10.89:
+- **ATR (2.0×)**: $254.84 - (2.0 × $10.89) = $233.06 stop ($21.78 at risk)
+- **Simple (5%)**: $254.84 × 0.95 = $242.10 stop ($12.74 at risk)
+- **Trailing (5%)**: $267 (historical high) × 0.95 = $253.65 stop ($1.19 at risk)
+
+**When to use ATR:**
+- Volatile stocks need wider stops to avoid being stopped out by normal price swings
+- ATR automatically adapts: volatile stocks get wider stops, stable stocks get tighter stops
+- Standard multipliers: 1.5× (tight), 2.0× (normal), 3.0× (loose)
+
+**Key difference from percentage modes:**
+- Percentage modes: Fixed % regardless of volatility
+- ATR mode: Adapts to each stock's actual price movement patterns
 
 ### Currency Handling
 

@@ -52,7 +52,13 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
                 f"[red]{str(result)[:30]}[/red]",
             )
         elif isinstance(result, StopLossResult):
-            type_str = "🔄 Trailing" if result.stop_loss_type.value == "trailing" else "📊 Simple"
+            if result.stop_loss_type.value == "trailing":
+                type_str = "🔄 Trailing"
+            elif result.stop_loss_type.value == "atr":
+                type_str = "📈 ATR"
+            else:
+                type_str = "📊 Simple"
+
             price_color = "green" if result.current_price > result.stop_loss_price else "red"
 
             table.add_row(
@@ -81,11 +87,25 @@ def calculate(
         typer.Option("--percentage", "-p", help="Stop-loss percentage (overrides config)"),
     ] = None,
     trailing: Annotated[
-        bool | None,
-        typer.Option(
-            "--trailing/--simple", "-t/-s", help="Use trailing stop-loss (overrides config)"
-        ),
-    ] = None,
+        bool,
+        typer.Option("--trailing", "-t", help="Use trailing stop-loss"),
+    ] = False,
+    simple: Annotated[
+        bool,
+        typer.Option("--simple", "-s", help="Use simple stop-loss"),
+    ] = False,
+    atr: Annotated[
+        bool,
+        typer.Option("--atr", "-a", help="Use ATR-based stop-loss"),
+    ] = False,
+    atr_period: Annotated[
+        int,
+        typer.Option("--atr-period", help="ATR calculation period (days)"),
+    ] = 14,
+    atr_multiplier: Annotated[
+        float,
+        typer.Option("--atr-multiplier", help="ATR multiplier for stop-loss distance"),
+    ] = 2.0,
     since: Annotated[
         str | None,
         typer.Option("--since", help="Start date for trailing calculation (YYYY-MM-DD)"),
@@ -103,6 +123,7 @@ def calculate(
         uv run stop-loss calculate --percentage 7.5 --trailing
         uv run stop-loss calculate TSLA -p 10 --simple
         uv run stop-loss calculate --trailing --since 2024-01-01
+        uv run stop-loss calculate --atr --atr-multiplier 2.5
     """
     try:
         # Load configuration
@@ -119,8 +140,22 @@ def calculate(
         # Determine percentage
         pct = percentage if percentage is not None else config.stop_loss_percentage
 
-        # Determine trailing mode
-        use_trailing = trailing if trailing is not None else config.trailing_enabled
+        # Determine calculation mode
+        mode_count = sum([simple, trailing, atr])
+        if mode_count > 1:
+            console.print("[red]Error: Only one mode (--simple, --trailing, --atr) can be specified.[/red]")
+            raise typer.Exit(1)
+
+        # Determine which mode to use
+        if atr:
+            use_mode = "atr"
+        elif trailing:
+            use_mode = "trailing"
+        elif simple:
+            use_mode = "simple"
+        else:
+            # Default from config
+            use_mode = "trailing" if config.trailing_enabled else "simple"
 
         # Parse since date if provided
         since_date: date | None = None
@@ -136,8 +171,8 @@ def calculate(
         calculator = StopLossCalculator()
         history_db = PriceHistoryDB() if not no_history else None
 
-        # Fetch historical data if using trailing mode and history is enabled
-        if use_trailing and history_db:
+        # Fetch historical data if using trailing or ATR mode and history is enabled
+        if use_mode in ("trailing", "atr") and history_db:
             console.print("[cyan]Updating historical price data...[/cyan]")
             for ticker in ticker_list:
                 try:
@@ -185,14 +220,36 @@ def calculate(
                 results.append((ticker, price_or_error))
             else:
                 try:
-                    # Get high water mark from DB if trailing mode
-                    hwm = None
-                    if use_trailing and history_db:
-                        hwm = history_db.get_high_water_mark(ticker, since_date)
+                    if use_mode == "atr":
+                        # ATR mode: calculate ATR from historical data
+                        if history_db:
+                            try:
+                                history_df = history_db.get_recent_history_df(ticker, atr_period + 1)
+                                atr_value = calculator.calculate_atr(history_df, atr_period)
+                                stop_loss = calculator.calculate_atr_stop_loss(
+                                    price_or_error, pct, atr_value, atr_multiplier
+                                )
+                            except ValueError as e:
+                                # Not enough historical data
+                                results.append((price_or_error, e))
+                                continue
+                        else:
+                            results.append((price_or_error, ValueError("ATR mode requires historical data")))
+                            continue
+                    elif use_mode == "trailing":
+                        # Trailing mode: get high water mark from DB
+                        hwm = None
+                        if history_db:
+                            hwm = history_db.get_high_water_mark(ticker, since_date)
+                        stop_loss = calculator.calculate(
+                            price_or_error, pct, trailing=True, high_water_mark=hwm
+                        )
+                    else:
+                        # Simple mode
+                        stop_loss = calculator.calculate(
+                            price_or_error, pct, trailing=False
+                        )
 
-                    stop_loss = calculator.calculate(
-                        price_or_error, pct, use_trailing, high_water_mark=hwm
-                    )
                     results.append((price_or_error, stop_loss))
                 except Exception as e:
                     results.append((price_or_error, e))
