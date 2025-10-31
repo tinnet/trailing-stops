@@ -37,7 +37,7 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
     table.add_column("50-Day SMA", justify="right")
     table.add_column("Stop-Loss Price", justify="right")
     table.add_column("Type", justify="center")
-    table.add_column("Percentage", justify="right")
+    table.add_column("Stop Method", justify="right")
     table.add_column("Risk/Share", justify="right")
 
     for stock_price, result in results:
