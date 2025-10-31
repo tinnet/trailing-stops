@@ -27,6 +27,7 @@ class StopLossResult:
     percentage: float
     currency: str
     dollar_risk: float  # Amount at risk per share
+    sma_50: float | None = None  # 50-day simple moving average (for display only)
 
     @property
     def formatted_percentage(self) -> str:
@@ -38,6 +39,13 @@ class StopLossResult:
         """Get formatted risk amount."""
         return f"{self.currency} {self.dollar_risk:.2f}"
 
+    @property
+    def formatted_sma(self) -> str:
+        """Get formatted 50-day SMA string."""
+        if self.sma_50 is None:
+            return "N/A"
+        return f"{self.currency} {self.sma_50:.2f}"
+
 
 class StopLossCalculator:
     """Calculate stop-loss prices for stocks."""
@@ -46,12 +54,15 @@ class StopLossCalculator:
         """Initialize the calculator."""
         self._high_water_marks: dict[str, float] = {}
 
-    def calculate_simple(self, stock_price: StockPrice, percentage: float) -> StopLossResult:
+    def calculate_simple(
+        self, stock_price: StockPrice, percentage: float, sma_50: float | None = None
+    ) -> StopLossResult:
         """Calculate simple stop-loss (percentage below current price).
 
         Args:
             stock_price: Current stock price information.
             percentage: Stop-loss percentage (0-100).
+            sma_50: Optional 50-day simple moving average (for display only).
 
         Returns:
             StopLossResult with calculated stop-loss price.
@@ -73,10 +84,15 @@ class StopLossCalculator:
             percentage=percentage,
             currency=stock_price.currency,
             dollar_risk=dollar_risk,
+            sma_50=sma_50,
         )
 
     def calculate_trailing(
-        self, stock_price: StockPrice, percentage: float, high_water_mark: float | None = None
+        self,
+        stock_price: StockPrice,
+        percentage: float,
+        high_water_mark: float | None = None,
+        sma_50: float | None = None,
     ) -> StopLossResult:
         """Calculate trailing stop-loss (tracks high water mark).
 
@@ -85,6 +101,7 @@ class StopLossCalculator:
             percentage: Stop-loss percentage (0-100).
             high_water_mark: Optional pre-calculated high water mark. If None,
                            uses in-memory tracking (legacy behavior).
+            sma_50: Optional 50-day simple moving average (for display only).
 
         Returns:
             StopLossResult with calculated trailing stop-loss price.
@@ -121,6 +138,7 @@ class StopLossCalculator:
             percentage=percentage,
             currency=stock_price.currency,
             dollar_risk=dollar_risk,
+            sma_50=sma_50,
         )
 
     def calculate(
@@ -216,6 +234,7 @@ class StopLossCalculator:
         percentage: float,
         atr: float,
         atr_multiplier: float = 2.0,
+        sma_50: float | None = None,
     ) -> StopLossResult:
         """Calculate ATR-based stop-loss.
 
@@ -224,6 +243,7 @@ class StopLossCalculator:
             percentage: Stop-loss percentage (used for display, not calculation).
             atr: Average True Range value.
             atr_multiplier: Multiplier for ATR (default 2.0).
+            sma_50: Optional 50-day simple moving average (for display only).
 
         Returns:
             StopLossResult with calculated ATR-based stop-loss price.
@@ -245,4 +265,5 @@ class StopLossCalculator:
             percentage=percentage,  # For display compatibility
             currency=stock_price.currency,
             dollar_risk=dollar_risk,
+            sma_50=sma_50,
         )

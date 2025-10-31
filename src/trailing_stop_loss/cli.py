@@ -34,6 +34,7 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
 
     table.add_column("Ticker", style="bold", justify="left")
     table.add_column("Current Price", justify="right")
+    table.add_column("50-Day SMA", justify="right")
     table.add_column("Stop-Loss Price", justify="right")
     table.add_column("Type", justify="center")
     table.add_column("Percentage", justify="right")
@@ -46,6 +47,7 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
             table.add_row(
                 stock_price.ticker if hasattr(stock_price, "ticker") else "?",
                 "[red]ERROR[/red]",
+                "[red]N/A[/red]",
                 "[red]N/A[/red]",
                 "[red]N/A[/red]",
                 "[red]N/A[/red]",
@@ -64,6 +66,7 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
             table.add_row(
                 result.ticker,
                 f"{result.currency} {result.current_price:.2f}",
+                result.formatted_sma,
                 f"[{price_color}]{result.currency} {result.stop_loss_price:.2f}[/{price_color}]",
                 type_str,
                 result.formatted_percentage,
@@ -219,6 +222,27 @@ def calculate(
                         ticker, price_or_error.current_price, price_or_error.timestamp
                     )
 
+        # Calculate 50-day SMA for all tickers
+        sma_values: dict[str, float | None] = {}
+        if history_db:
+            for ticker in price_results.keys():
+                try:
+                    history_df = history_db.get_recent_history_df(ticker, 50)
+                    sma_values[ticker] = float(history_df["Close"].mean())
+                except ValueError:
+                    # Not enough data - try to fetch it
+                    try:
+                        start = date.today() - timedelta(days=75)  # 50 trading days + buffer
+                        hist_data = fetcher.fetch_historical_data(ticker, start_date=start)
+                        history_db.store_history(ticker, hist_data)
+                        history_df = history_db.get_recent_history_df(ticker, 50)
+                        sma_values[ticker] = float(history_df["Close"].mean())
+                    except Exception:
+                        sma_values[ticker] = None
+        else:
+            for ticker in price_results.keys():
+                sma_values[ticker] = None
+
         # Calculate stop-losses
         results: list[tuple[StockPrice | str, object]] = []
         for ticker, price_or_error in price_results.items():
@@ -226,6 +250,8 @@ def calculate(
                 results.append((ticker, price_or_error))
             else:
                 try:
+                    # Get SMA for this ticker
+                    sma_50 = sma_values.get(ticker)
                     if use_mode == "atr":
                         # ATR mode: calculate ATR from historical data
                         if history_db:
@@ -233,7 +259,7 @@ def calculate(
                                 history_df = history_db.get_recent_history_df(ticker, atr_period + 1)
                                 atr_value = calculator.calculate_atr(history_df, atr_period)
                                 stop_loss = calculator.calculate_atr_stop_loss(
-                                    price_or_error, pct, atr_value, atr_multiplier
+                                    price_or_error, pct, atr_value, atr_multiplier, sma_50
                                 )
                             except ValueError as e:
                                 # Not enough historical data - try to fetch it now
@@ -251,7 +277,7 @@ def calculate(
                                     history_df = history_db.get_recent_history_df(ticker, atr_period + 1)
                                     atr_value = calculator.calculate_atr(history_df, atr_period)
                                     stop_loss = calculator.calculate_atr_stop_loss(
-                                        price_or_error, pct, atr_value, atr_multiplier
+                                        price_or_error, pct, atr_value, atr_multiplier, sma_50
                                     )
                                 except Exception as retry_error:
                                     results.append((price_or_error, ValueError(f"Cannot fetch enough data: {retry_error}")))
@@ -264,13 +290,13 @@ def calculate(
                         hwm = None
                         if history_db:
                             hwm = history_db.get_high_water_mark(ticker, since_date)
-                        stop_loss = calculator.calculate(
-                            price_or_error, pct, trailing=True, high_water_mark=hwm
+                        stop_loss = calculator.calculate_trailing(
+                            price_or_error, pct, high_water_mark=hwm, sma_50=sma_50
                         )
                     else:
                         # Simple mode
-                        stop_loss = calculator.calculate(
-                            price_or_error, pct, trailing=False
+                        stop_loss = calculator.calculate_simple(
+                            price_or_error, pct, sma_50=sma_50
                         )
 
                     results.append((price_or_error, stop_loss))
