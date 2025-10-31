@@ -191,8 +191,14 @@ def calculate(
                                     f"  [dim]Added {rows} new data points for {ticker}[/dim]"
                                 )
                     else:
-                        # First time fetching - get 3 months of data or from since_date
-                        start = since_date or (date.today() - timedelta(days=90))
+                        # First time fetching - get enough data for ATR or trailing mode
+                        # For ATR: need atr_period trading days (~3x calendar days + buffer)
+                        # For trailing: 3 months default is usually enough
+                        if use_mode == "atr":
+                            days_needed = max(atr_period * 3, 180)
+                        else:
+                            days_needed = 90
+                        start = since_date or (date.today() - timedelta(days=days_needed))
                         hist_data = fetcher.fetch_historical_data(ticker, start_date=start)
                         rows = history_db.store_history(ticker, hist_data)
                         console.print(
@@ -230,9 +236,26 @@ def calculate(
                                     price_or_error, pct, atr_value, atr_multiplier
                                 )
                             except ValueError as e:
-                                # Not enough historical data
-                                results.append((price_or_error, e))
-                                continue
+                                # Not enough historical data - try to fetch it now
+                                console.print(f"[yellow]Insufficient data for {ticker}, fetching historical data...[/yellow]")
+                                try:
+                                    # Fetch enough data: ATR period needs trading days, so fetch ~3x calendar days
+                                    # Plus buffer for weekends/holidays (minimum 6 months for safety)
+                                    days_needed = max(atr_period * 3, 180)
+                                    start = date.today() - timedelta(days=days_needed)
+                                    hist_data = fetcher.fetch_historical_data(ticker, start_date=start)
+                                    rows = history_db.store_history(ticker, hist_data)
+                                    console.print(f"  [dim]Stored {rows} historical data points for {ticker}[/dim]")
+
+                                    # Retry calculation
+                                    history_df = history_db.get_recent_history_df(ticker, atr_period + 1)
+                                    atr_value = calculator.calculate_atr(history_df, atr_period)
+                                    stop_loss = calculator.calculate_atr_stop_loss(
+                                        price_or_error, pct, atr_value, atr_multiplier
+                                    )
+                                except Exception as retry_error:
+                                    results.append((price_or_error, ValueError(f"Cannot fetch enough data: {retry_error}")))
+                                    continue
                         else:
                             results.append((price_or_error, ValueError("ATR mode requires historical data")))
                             continue
