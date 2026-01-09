@@ -265,6 +265,7 @@ class StopLossCalculator:
         atr: float,
         atr_multiplier: float = 2.0,
         sma_50: float | None = None,
+        base_price: float | None = None,
     ) -> StopLossResult:
         """Calculate ATR-based stop-loss.
 
@@ -274,6 +275,7 @@ class StopLossCalculator:
             atr: Average True Range value.
             atr_multiplier: Multiplier for ATR (default 2.0).
             sma_50: Optional 50-day simple moving average (for display only).
+            base_price: Optional base price (e.g., 52-week high) to use instead of current price.
 
         Returns:
             StopLossResult with calculated ATR-based stop-loss price.
@@ -284,7 +286,9 @@ class StopLossCalculator:
         if atr_multiplier <= 0:
             raise ValueError(f"ATR multiplier must be positive, got {atr_multiplier}")
 
-        stop_loss_price = stock_price.current_price - (atr * atr_multiplier)
+        # Use base_price if provided, otherwise use current price
+        calculation_base = base_price if base_price is not None else stock_price.current_price
+        stop_loss_price = calculation_base - (atr * atr_multiplier)
         dollar_risk = stock_price.current_price - stop_loss_price
 
         return StopLossResult(
@@ -298,4 +302,5 @@ class StopLossCalculator:
             sma_50=sma_50,
             atr_value=atr,
             atr_multiplier=atr_multiplier,
+            week_52_high=base_price if base_price is not None else None,
         )
