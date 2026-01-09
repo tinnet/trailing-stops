@@ -18,6 +18,7 @@ class StockPrice:
     previous_close: float | None = None
     week_52_high: float | None = None
     week_52_low: float | None = None
+    entry_price: float | None = None  # User-provided entry price
 
 
 class PriceFetcher:
@@ -27,12 +28,15 @@ class PriceFetcher:
         """Initialize the price fetcher."""
         self._cache: dict[str, StockPrice] = {}
 
-    def fetch_price(self, ticker: str, use_cache: bool = False) -> StockPrice:
+    def fetch_price(
+        self, ticker: str, use_cache: bool = False, entry_price: float | None = None
+    ) -> StockPrice:
         """Fetch current price for a ticker symbol.
 
         Args:
             ticker: Stock ticker symbol (e.g., 'AAPL', 'GOOGL').
             use_cache: Whether to use cached price if available.
+            entry_price: Optional user-provided entry price.
 
         Returns:
             StockPrice object with current price information.
@@ -41,7 +45,11 @@ class PriceFetcher:
             ValueError: If ticker is invalid or price cannot be fetched.
         """
         if use_cache and ticker in self._cache:
-            return self._cache[ticker]
+            cached = self._cache[ticker]
+            # Update entry price in cached result if provided
+            if entry_price is not None:
+                cached.entry_price = entry_price
+            return cached
 
         try:
             stock = yf.Ticker(ticker)
@@ -65,6 +73,7 @@ class PriceFetcher:
                 previous_close=info.get("previousClose"),
                 week_52_high=info.get("fiftyTwoWeekHigh"),
                 week_52_low=info.get("fiftyTwoWeekLow"),
+                entry_price=entry_price,
             )
 
             self._cache[ticker] = stock_price
@@ -74,12 +83,12 @@ class PriceFetcher:
             raise ValueError(f"Failed to fetch price for {ticker}: {e}") from e
 
     def fetch_multiple(
-        self, tickers: list[str], skip_errors: bool = True
+        self, tickers: list[str] | list[tuple[str, float | None]], skip_errors: bool = True
     ) -> dict[str, StockPrice | Exception]:
         """Fetch prices for multiple tickers.
 
         Args:
-            tickers: List of ticker symbols.
+            tickers: List of ticker symbols or (ticker, entry_price) tuples.
             skip_errors: If True, continue on errors; if False, raise on first error.
 
         Returns:
@@ -87,9 +96,16 @@ class PriceFetcher:
         """
         results: dict[str, StockPrice | Exception] = {}
 
-        for ticker in tickers:
+        for item in tickers:
+            # Handle both formats: "AAPL" or ("AAPL", 150.0)
+            if isinstance(item, tuple):
+                ticker, entry_price = item
+            else:
+                ticker = item
+                entry_price = None
+
             try:
-                results[ticker] = self.fetch_price(ticker)
+                results[ticker] = self.fetch_price(ticker, entry_price=entry_price)
             except Exception as e:
                 if skip_errors:
                     results[ticker] = e

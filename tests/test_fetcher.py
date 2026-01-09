@@ -114,3 +114,87 @@ def test_fetch_52week_high_low(fetcher: PriceFetcher) -> None:
         assert stock_price.week_52_low > 0
         # 52-week low should be <= current price (or close to it)
         assert stock_price.week_52_low <= stock_price.current_price * 2.0
+
+
+# Tests for entry_price functionality
+
+
+def test_fetch_price_with_entry_price(fetcher: PriceFetcher) -> None:
+    """Test fetching price with entry price."""
+    stock_price = fetcher.fetch_price("AAPL", entry_price=150.0)
+
+    assert isinstance(stock_price, StockPrice)
+    assert stock_price.ticker == "AAPL"
+    assert stock_price.current_price > 0
+    assert stock_price.entry_price == 150.0
+
+
+def test_fetch_price_without_entry_price(fetcher: PriceFetcher) -> None:
+    """Test fetching price without entry price (default behavior)."""
+    stock_price = fetcher.fetch_price("AAPL")
+
+    assert isinstance(stock_price, StockPrice)
+    assert stock_price.entry_price is None
+
+
+def test_fetch_multiple_with_entry_prices(fetcher: PriceFetcher) -> None:
+    """Test fetching multiple tickers with entry prices (tuple format)."""
+    tickers = [("AAPL", 150.0), ("GOOGL", 2800.0)]
+    results = fetcher.fetch_multiple(tickers, skip_errors=True)
+
+    assert len(results) == 2
+    assert isinstance(results["AAPL"], StockPrice)
+    assert results["AAPL"].entry_price == 150.0
+    assert isinstance(results["GOOGL"], StockPrice)
+    assert results["GOOGL"].entry_price == 2800.0
+
+
+def test_fetch_multiple_mixed_format(fetcher: PriceFetcher) -> None:
+    """Test fetching with mixed format (some with entry prices, some without)."""
+    tickers: list[str | tuple[str, float]] = [("AAPL", 150.0), "GOOGL", ("MSFT", 400.0)]
+    results = fetcher.fetch_multiple(tickers, skip_errors=True)
+
+    assert len(results) == 3
+    assert isinstance(results["AAPL"], StockPrice)
+    assert results["AAPL"].entry_price == 150.0
+    assert isinstance(results["GOOGL"], StockPrice)
+    assert results["GOOGL"].entry_price is None
+    assert isinstance(results["MSFT"], StockPrice)
+    assert results["MSFT"].entry_price == 400.0
+
+
+def test_fetch_price_entry_price_with_cache(fetcher: PriceFetcher) -> None:
+    """Test that entry price is updated when using cache."""
+    # First fetch without entry price
+    price1 = fetcher.fetch_price("AAPL")
+    assert price1.entry_price is None
+
+    # Second fetch with cache and entry price
+    price2 = fetcher.fetch_price("AAPL", use_cache=True, entry_price=150.0)
+    assert price2.entry_price == 150.0
+
+    # Both should reference the same cached object
+    assert price1.ticker == price2.ticker
+
+
+def test_entry_price_persists_in_stock_price(fetcher: PriceFetcher) -> None:
+    """Test that entry price flows through the StockPrice object."""
+    stock_price = fetcher.fetch_price("AAPL", entry_price=175.50)
+
+    # Verify all expected fields are present
+    assert stock_price.ticker == "AAPL"
+    assert stock_price.current_price > 0
+    assert stock_price.currency in ["USD", "usd"]
+    assert stock_price.timestamp is not None
+    assert stock_price.entry_price == 175.50
+
+
+def test_fetch_multiple_all_plain_tickers(fetcher: PriceFetcher) -> None:
+    """Test backward compatibility with plain ticker list."""
+    tickers = ["AAPL", "GOOGL"]
+    results = fetcher.fetch_multiple(tickers, skip_errors=True)
+
+    assert len(results) == 2
+    for ticker in tickers:
+        assert isinstance(results[ticker], StockPrice)
+        assert results[ticker].entry_price is None
