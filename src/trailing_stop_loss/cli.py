@@ -372,13 +372,7 @@ def calculate(
             "\n[italic yellow]Disclaimer: This tool is for educational purposes only and "
             "does not constitute financial advice.[/italic yellow]"
         )
-        console.print()
 
-        # Summary
-        successful = sum(1 for _, result in results if not isinstance(result, Exception))
-        console.print(
-            f"[green]Successfully calculated {successful}/{len(ticker_list)} stop-losses[/green]"
-        )
 
     except FileNotFoundError as e:
         console.print(f"[red]Error: {e}[/red]")
