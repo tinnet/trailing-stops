@@ -9,7 +9,10 @@ This document helps AI coding agents understand the project's architecture, deci
 **Core Features**:
 - Simple stop-loss: Fixed percentage below current price
 - Trailing stop-loss: Tracks historical high water marks using SQLite
+- ATR-based stop-loss: Volatility-adaptive stops using Average True Range
+- 52-week high mode: Conservative stops based on peak prices
 - Multi-currency support: USD/CAD (and others via yfinance)
+- Historical data storage: SQLite database with 52-week metrics
 - Beautiful CLI output: Tables with typer + rich
 
 **Target Users**: Individual traders who want to:
@@ -51,6 +54,23 @@ This document helps AI coding agents understand the project's architecture, deci
   - PRIMARY KEY (ticker, date) auto-deduplicates
   - Indexed queries for fast MAX(high) lookups
   - Handles concurrent access gracefully
+  - Schema:
+    ```sql
+    CREATE TABLE price_history (
+        ticker TEXT NOT NULL,
+        date DATE NOT NULL,
+        open REAL,
+        high REAL NOT NULL,
+        low REAL,
+        close REAL NOT NULL,
+        volume INTEGER,
+        week_52_high REAL,     -- Stored from yfinance API
+        week_52_low REAL,      -- Stored from yfinance API
+        PRIMARY KEY (ticker, date)
+    )
+    ```
+  - INSERT OR REPLACE: Updates existing entries (e.g., intraday price updates)
+  - Automatic migration: Adds new columns to existing databases on startup
 
 ### Architecture Layers
 
@@ -383,6 +403,67 @@ def calculate_🎯(x):  # ❌ Never use emoji in identifiers
 4. **Add tests** in `tests/test_calculator.py`
 5. **Update CLI** to expose new mode
 
+### Implementing Optional Calculation Variants (like 52-Week High)
+
+Instead of creating entirely new modes, use optional parameters when calculation varies only by base price:
+
+1. **Add optional parameter** to existing calculation methods:
+   ```python
+   def calculate_simple(
+       self,
+       stock_price: StockPrice,
+       percentage: float,
+       sma_50: float | None = None,
+       base_price: float | None = None,  # New parameter
+   ) -> StopLossResult:
+       # Use base_price if provided, else current_price
+       calculation_base = base_price if base_price is not None else stock_price.current_price
+       stop_loss_price = calculation_base * (1 - percentage / 100)
+       # Risk always relative to current price
+       dollar_risk = stock_price.current_price - stop_loss_price
+   ```
+
+2. **Add to result dataclass** for display:
+   ```python
+   @dataclass
+   class StopLossResult:
+       # ... existing fields ...
+       week_52_high: float | None = None  # Store base price used
+   ```
+
+3. **Update CLI** to fetch and pass the value:
+   ```python
+   # Fetch 52-week high if flag set
+   week_52_highs: dict[str, float | None] = {}
+   if use_52week_high and history_db:
+       for ticker in price_results.keys():
+           week_52_highs[ticker] = history_db.get_latest_52week_high(ticker)
+
+   # Pass to calculator
+   base_price = week_52_highs.get(ticker) if use_52week_high else None
+   result = calculator.calculate_simple(price, percentage, sma_50, base_price)
+   ```
+
+4. **Update display** to show optional column:
+   ```python
+   # Check if any results have 52-week data
+   has_52week = any(
+       hasattr(result, "week_52_high") and result.week_52_high is not None
+       for _, result in results
+       if not isinstance(result, Exception)
+   )
+
+   # Conditionally add column
+   if has_52week:
+       table.add_column("52-Week High", justify="right")
+   ```
+
+5. **Write comprehensive tests**:
+   - Test with base_price parameter
+   - Test without base_price (backward compatibility)
+   - Test that risk is always relative to current price
+   - Test edge cases (base_price < current_price)
+
 ## File Organization
 
 ### Project Structure
@@ -413,6 +494,7 @@ trailing-stop-loss/
 
 **fetcher.py**:
 - Fetch current prices (`fetch_price`)
+- Fetch 52-week high/low from yfinance (`week_52_high`, `week_52_low` fields)
 - Fetch historical OHLC data (`fetch_historical_data`)
 - In-memory caching for current session
 - **No** business logic or database access
@@ -420,14 +502,18 @@ trailing-stop-loss/
 **history.py**:
 - SQLite connection management
 - Store/retrieve historical OHLC data
-- Calculate high water marks from DB
-- Schema initialization
+- Store/retrieve 52-week high/low values
+- Calculate high water marks from DB (`get_high_water_mark`)
+- Get latest 52-week high (`get_latest_52week_high`)
+- Schema initialization with automatic migration
 - **No** fetching or calculations
 
 **calculator.py**:
-- Stop-loss calculations (simple, trailing)
+- Stop-loss calculations (simple, trailing, ATR)
+- Optional `base_price` parameter for 52-week high mode
+- ATR calculation from historical DataFrame
 - **No** data fetching or persistence
-- Pure functions (except legacy in-memory mode)
+- Pure functions (except legacy in-memory trailing mode)
 
 **config.py**:
 - Load TOML configuration

@@ -7,6 +7,8 @@ Calculate stop-loss prices for stock positions with a beautiful CLI interface.
 - **Simple Stop-Loss**: Calculate stop-loss as a percentage below current price
 - **Trailing Stop-Loss**: Track high-water marks and adjust stop-loss dynamically
 - **ATR-Based Stop-Loss**: Volatility-adaptive stop-loss using Average True Range
+- **52-Week High Mode**: Base calculations on 52-week high for more conservative stops
+- **Historical Data**: SQLite database stores price history and 52-week metrics
 - **Beautiful CLI**: Rich table output with color-coded results using `typer` and `rich`
 - **Multi-Currency Support**: Automatically handles USD, CAD, and other currencies
 - **TOML Configuration**: Easy configuration for default tickers and settings
@@ -128,6 +130,29 @@ uv run stop-loss calculate SHOP.TO NVDA -p 8 --trailing
 uv run stop-loss calculate --config /path/to/config.toml
 uv run stop-loss calculate -c custom-config.toml
 ```
+
+### 52-Week High Mode
+
+Base stop-loss calculations on the 52-week high instead of current price (more conservative):
+
+```bash
+# Simple mode with 52-week high (8% below peak)
+uv run stop-loss calculate --use-52week-high --simple -p 8
+uv run stop-loss calculate -w --simple -p 8  # short flag
+
+# ATR mode with 52-week high
+uv run stop-loss calculate --use-52week-high --atr
+uv run stop-loss calculate -w --atr  # short flag
+
+# Works with multiple tickers
+uv run stop-loss calculate AAPL MSFT NVDA -w --simple -p 10
+```
+
+**When to use**: If you bought near the 52-week high and want to protect gains from the peak price rather than current price.
+
+**Example**: AAPL at $259.04 with 52-week high of $288.62:
+- **Normal mode**: 8% stop = $238.32 (risk $20.72/share)
+- **52-week mode**: 8% stop = $265.53 (risk -$6.49/share, above current price)
 
 ### Advanced Options
 
@@ -278,6 +303,45 @@ Stop-Loss Price = Current Price - (ATR × Multiplier)
 - Percentage modes: Fixed % regardless of volatility
 - ATR mode: Adapts to each stock's actual price movement patterns
 
+### 52-Week High Mode
+
+Uses the 52-week high as the base price for calculating stop-losses:
+
+```
+# With Simple Strategy
+Stop-Loss Price = 52-Week High × (1 - Percentage / 100)
+
+# With ATR Strategy
+Stop-Loss Price = 52-Week High - (ATR × Multiplier)
+```
+
+**How it works:**
+1. Fetches current 52-week high from yfinance on each run
+2. Stores the value in SQLite database with the price snapshot
+3. Uses the most recent 52-week high as the base for calculations
+4. Dollar risk is still calculated relative to current price
+
+**Example:** AAPL at $259.04 with 52-week high of $288.62:
+
+| Mode | Calculation | Stop-Loss | Risk/Share |
+|------|------------|-----------|------------|
+| **Simple (8%)** | $259.04 × 0.92 | $238.32 | $20.72 |
+| **52-week Simple (8%)** | $288.62 × 0.92 | $265.53 | -$6.49* |
+| **ATR (2.0×)** | $259.04 - ($3.85 × 2.0) | $251.33 | $7.71 |
+| **52-week ATR (2.0×)** | $288.62 - ($3.85 × 2.0) | $280.91 | -$21.87* |
+
+**Note on negative risk**: When 52-week high mode places the stop-loss above current price, the risk appears negative. This indicates a more conservative position where you'd exit if the price doesn't recover to near its peak.
+
+**When to use 52-week high mode:**
+- You bought near the peak and want to break even or minimize losses
+- You're protecting paper gains from a stock that's pulled back from highs
+- You prefer a more conservative approach that doesn't chase price declines
+
+**When NOT to use:**
+- Stock is at or near its 52-week high (use normal mode instead)
+- You bought significantly below current price (trailing mode is better)
+- Stock has strong downtrend from peak (may get stopped out immediately)
+
 ### Currency Handling
 
 The tool automatically detects and displays the currency for each stock:
@@ -293,20 +357,34 @@ You can also use the package programmatically:
 from trailing_stop_loss.config import Config
 from trailing_stop_loss.fetcher import PriceFetcher
 from trailing_stop_loss.calculator import StopLossCalculator
+from trailing_stop_loss.history import PriceHistoryDB
 
 # Load config
 config = Config("config.toml")
 
 # Fetch prices
 fetcher = PriceFetcher()
-price = fetcher.fetch_price("SHOP.TO")  # Canadian stock
+price = fetcher.fetch_price("AAPL")
+print(f"Current: ${price.current_price}, 52-week high: ${price.week_52_high}")
 
-# Calculate stop-loss
+# Simple stop-loss
 calculator = StopLossCalculator()
-result = calculator.calculate(price, percentage=5.0, trailing=False)
+simple_result = calculator.calculate_simple(price, percentage=8.0)
+print(f"Simple: ${simple_result.stop_loss_price:.2f} (${simple_result.dollar_risk:.2f} risk)")
 
-print(f"{result.ticker}: {result.currency} {result.current_price} → {result.currency} {result.stop_loss_price}")
-# Output: SHOP.TO: CAD 85.50 → CAD 81.23
+# 52-week high mode
+week52_result = calculator.calculate_simple(price, percentage=8.0, base_price=price.week_52_high)
+print(f"52-week: ${week52_result.stop_loss_price:.2f} (${week52_result.dollar_risk:.2f} risk)")
+
+# ATR-based with 52-week high
+history_db = PriceHistoryDB()
+history_df = history_db.get_recent_history_df("AAPL", days=15)
+atr = calculator.calculate_atr(history_df, period=14)
+atr_result = calculator.calculate_atr_stop_loss(
+    price, percentage=8.0, atr=atr, atr_multiplier=2.0,
+    base_price=price.week_52_high  # Optional: use 52-week high
+)
+print(f"ATR: ${atr_result.stop_loss_price:.2f} (${atr_result.dollar_risk:.2f} risk)")
 ```
 
 ## Dependencies
