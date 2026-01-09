@@ -182,8 +182,16 @@ def calculate(
         # Load configuration
         config = Config(config_file)
 
-        # Determine tickers
-        ticker_list = tickers if tickers else config.tickers
+        # Determine tickers (parse TICKER:PRICE format)
+        from trailing_stop_loss.config import parse_ticker_with_price
+
+        if tickers:
+            # Parse CLI arguments
+            ticker_list = [parse_ticker_with_price(t) for t in tickers]
+        else:
+            # Use config with entry prices
+            ticker_list = config.tickers_with_prices
+
         if not ticker_list:
             console.print(
                 "[red]No tickers specified. Add them to config.toml or pass as arguments."
@@ -227,7 +235,9 @@ def calculate(
         # Fetch historical data if using trailing or ATR mode and history is enabled
         if use_mode in ("trailing", "atr") and history_db:
             console.print("[cyan]Updating historical price data...[/cyan]")
-            for ticker in ticker_list:
+            for ticker_item in ticker_list:
+                # Extract ticker from tuple (ticker, entry_price)
+                ticker = ticker_item[0] if isinstance(ticker_item, tuple) else ticker_item
                 try:
                     # Check if we have data
                     last_update = history_db.get_last_update_date(ticker)
@@ -317,6 +327,10 @@ def calculate(
                     sma_50 = sma_values.get(ticker)
                     base_price = week_52_highs.get(ticker) if week52_high else None
 
+                    # Entry price overrides 52-week high if provided
+                    if price_or_error.entry_price is not None:
+                        base_price = price_or_error.entry_price
+
                     if use_mode == "atr":
                         # ATR mode: calculate ATR from historical data
                         if history_db:
@@ -355,6 +369,13 @@ def calculate(
                         hwm = None
                         if history_db:
                             hwm = history_db.get_high_water_mark(ticker, since_date)
+
+                        # Entry price sets floor for high water mark
+                        if hwm is not None and price_or_error.entry_price is not None:
+                            hwm = max(hwm, price_or_error.entry_price)
+                        elif hwm is None and price_or_error.entry_price is not None:
+                            hwm = price_or_error.entry_price
+
                         stop_loss = calculator.calculate_trailing(
                             price_or_error, pct, high_water_mark=hwm, sma_50=sma_50
                         )
