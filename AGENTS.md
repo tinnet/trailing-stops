@@ -720,6 +720,40 @@ sqlite3 .data/price_history.db "SELECT COUNT(*) FROM price_history WHERE ticker=
 2. Run `stop-loss calculate --trailing` daily/weekly
 3. Use output to manually set stop-losses in Wealthsimple
 
+### Guidance Column Design Decision
+
+**What it does:**
+The "Guidance" column compares the calculated stop-loss to the 50-day SMA:
+- `stop_loss_price < sma_50` → "Raise stop" (yellow)
+- `stop_loss_price >= sma_50` → "Keep current" (green)
+- `sma_50 is None` → "N/A"
+
+**Technical assumption:**
+Assumes the 50-day SMA acts as a support level (technical analysis concept). If price is above SMA and holding, the theory is you could tighten your stop-loss to lock in gains.
+
+**Code location:**
+- Calculated: `calculator.py:36-48` (`formatted_guidance` property)
+- Displayed: `cli.py:83-88` (with color coding)
+
+**Known limitations:**
+1. **52-week high mode**: When stop-loss is above current price (conservative position), the guidance may suggest "Keep current" even though the stop would trigger immediately. The logic doesn't account for stop > current scenarios.
+2. **Not universal**: SMA as support is a technical analysis concept, not a market law. Works better in trending markets than ranging markets.
+3. **Optional data**: Requires 50+ days of historical data. First-time users see "N/A" until enough data accumulates.
+4. **Same logic for all modes**: The comparison is identical for simple/trailing/ATR/52-week modes, but the interpretation differs:
+   - Simple/Trailing: Straightforward - tighten if above support
+   - ATR: Less applicable since ATR already adapts to volatility
+   - 52-week high: Can be misleading when stop > current
+
+**Why it exists:**
+User-requested feature to provide actionable guidance. Intended as educational, not prescriptive. Users should apply their own judgment.
+
+**Potential improvements (not implemented):**
+- Detect when stop > current and show different guidance
+- Different logic for different stop-loss modes
+- Configurable comparison (e.g., 20-day vs 50-day SMA)
+- Disable guidance for 52-week high mode
+- Add disclaimer in table footer
+
 ### Design Philosophy
 
 **Pragmatism over purity**:

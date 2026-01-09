@@ -173,6 +173,43 @@ uv run stop-loss calculate --trailing --no-history
 uv run stop-loss calculate -t -H  # short form
 ```
 
+## Understanding the Output
+
+### Guidance Column
+
+The Guidance column provides suggestions based on the 50-day Simple Moving Average (SMA):
+
+**Possible Values:**
+- **"Raise stop"** (yellow) - Your stop-loss is below the 50-day SMA
+- **"Keep current"** (green) - Your stop-loss is at or above the 50-day SMA
+- **"N/A"** - No 50-day SMA available (insufficient historical data)
+
+**How it works:**
+The guidance compares your calculated stop-loss price to the 50-day SMA:
+- If `stop-loss < SMA`: Suggests "Raise stop" (price has support from SMA, you could tighten)
+- If `stop-loss >= SMA`: Suggests "Keep current" (stop is appropriately positioned)
+
+**When it makes sense:**
+- ✅ **Simple mode**: If price is trending above SMA, you might tighten your stop
+- ✅ **Trailing mode**: Same logic - tighten if price holds above SMA
+- ✅ **ATR mode**: If price respects SMA support, consider tighter stop
+
+**Limitations:**
+- ⚠️ **52-week high mode**: Guidance may be misleading when stop-loss is above current price
+- ⚠️ Assumes SMA acts as support (technical analysis assumption, not always true)
+- ⚠️ Only available when 50+ days of historical data exists
+- ⚠️ Should be used as a suggestion, not a rule - always consider your own risk tolerance
+
+**Example:**
+```
+Current Price: $259.04
+50-Day SMA:    $272.79 (price below average - caution)
+Stop-Loss:     $246.09
+Guidance:      "Raise stop" (stop well below SMA, could tighten)
+```
+
+The guidance is educational - use your own judgment based on market conditions and your risk tolerance.
+
 ### CLI Flag Reference
 
 All flags with their short forms:
