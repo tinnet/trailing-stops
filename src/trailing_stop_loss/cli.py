@@ -234,6 +234,15 @@ def calculate(
             # Default from config
             use_mode = "trailing" if config.trailing_enabled else "simple"
 
+        # Validate entry prices only work with trailing mode
+        has_entry_prices = any(price is not None for _, price in ticker_list)
+        if has_entry_prices and use_mode != "trailing":
+            console.print(
+                "[red]Error: Entry prices (TICKER:PRICE format) only supported with trailing mode.[/red]"
+            )
+            console.print("[yellow]Use --trailing flag or enable trailing_enabled in config.toml[/yellow]")
+            raise typer.Exit(1)
+
         # Parse since date if provided
         since_date: date | None = None
         if since:
@@ -342,10 +351,6 @@ def calculate(
                     # Get SMA and 52-week high for this ticker
                     sma_50 = sma_values.get(ticker)
                     base_price = week_52_highs.get(ticker) if week52_high else None
-
-                    # Entry price overrides 52-week high if provided
-                    if price_or_error.entry_price is not None:
-                        base_price = price_or_error.entry_price
 
                     if use_mode == "atr":
                         # ATR mode: calculate ATR from historical data
