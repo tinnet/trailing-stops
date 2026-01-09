@@ -723,7 +723,8 @@ sqlite3 .data/price_history.db "SELECT COUNT(*) FROM price_history WHERE ticker=
 ### Guidance Column Design Decision
 
 **What it does:**
-The "Guidance" column compares the calculated stop-loss to the 50-day SMA:
+The "Guidance" column provides warnings and suggestions based on stop-loss position:
+- `stop_loss_price > current_price` → "⚠️ Above current" (red) - **Priority check**
 - `stop_loss_price < sma_50` → "Raise stop" (yellow)
 - `stop_loss_price >= sma_50` → "Keep current" (green)
 - `sma_50 is None` → "N/A"
@@ -736,23 +737,26 @@ Assumes the 50-day SMA acts as a support level (technical analysis concept). If 
 - Displayed: `cli.py:83-88` (with color coding)
 
 **Known limitations:**
-1. **52-week high mode**: When stop-loss is above current price (conservative position), the guidance may suggest "Keep current" even though the stop would trigger immediately. The logic doesn't account for stop > current scenarios.
-2. **Not universal**: SMA as support is a technical analysis concept, not a market law. Works better in trending markets than ranging markets.
-3. **Optional data**: Requires 50+ days of historical data. First-time users see "N/A" until enough data accumulates.
-4. **Same logic for all modes**: The comparison is identical for simple/trailing/ATR/52-week modes, but the interpretation differs:
+1. **Not universal**: SMA as support is a technical analysis concept, not a market law. Works better in trending markets than ranging markets.
+2. **Optional data**: Requires 50+ days of historical data. First-time users see "N/A" until enough data accumulates.
+3. **Different applicability by mode**:
    - Simple/Trailing: Straightforward - tighten if above support
    - ATR: Less applicable since ATR already adapts to volatility
-   - 52-week high: Can be misleading when stop > current
+   - 52-week high: Warning shows when stop > current (fixed in latest version)
+
+**Fixed issues:**
+- ✅ **52-week high mode**: Now correctly shows "⚠️ Above current" warning when stop-loss is above current price
+- ✅ **Stop-loss price coloring**: Displays in red when above current price (would trigger immediately)
+- ✅ Priority check ensures warning shows before SMA-based guidance
 
 **Why it exists:**
 User-requested feature to provide actionable guidance. Intended as educational, not prescriptive. Users should apply their own judgment.
 
-**Potential improvements (not implemented):**
-- Detect when stop > current and show different guidance
-- Different logic for different stop-loss modes
-- Configurable comparison (e.g., 20-day vs 50-day SMA)
-- Disable guidance for 52-week high mode
-- Add disclaimer in table footer
+**Potential improvements (not yet implemented):**
+- Different logic for different stop-loss modes (currently uses same SMA check for all)
+- Configurable comparison period (e.g., 20-day vs 50-day SMA)
+- Add disclaimer in table footer explaining guidance is educational
+- Option to disable guidance entirely for users who don't want it
 
 ### Design Philosophy
 

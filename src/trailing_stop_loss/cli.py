@@ -77,10 +77,16 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
             else:
                 type_str = "📊 Simple"
 
-            price_color = "green" if result.current_price > result.stop_loss_price else "red"
+            # Color stop-loss price: red if above current (would trigger), green if below
+            if result.stop_loss_price > result.current_price:
+                price_color = "red"
+            else:
+                price_color = "green"
 
             # Color code guidance
-            if result.formatted_guidance == "Raise stop":
+            if result.formatted_guidance == "⚠️ Above current":
+                guidance_str = f"[red]{result.formatted_guidance}[/red]"
+            elif result.formatted_guidance == "Raise stop":
                 guidance_str = f"[yellow]{result.formatted_guidance}[/yellow]"
             elif result.formatted_guidance == "Keep current":
                 guidance_str = f"[green]{result.formatted_guidance}[/green]"

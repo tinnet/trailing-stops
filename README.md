@@ -180,14 +180,16 @@ uv run stop-loss calculate -t -H  # short form
 The Guidance column provides suggestions based on the 50-day Simple Moving Average (SMA):
 
 **Possible Values:**
+- **"⚠️ Above current"** (red) - Stop-loss is above current price (would trigger immediately)
 - **"Raise stop"** (yellow) - Your stop-loss is below the 50-day SMA
 - **"Keep current"** (green) - Your stop-loss is at or above the 50-day SMA
 - **"N/A"** - No 50-day SMA available (insufficient historical data)
 
 **How it works:**
-The guidance compares your calculated stop-loss price to the 50-day SMA:
-- If `stop-loss < SMA`: Suggests "Raise stop" (price has support from SMA, you could tighten)
-- If `stop-loss >= SMA`: Suggests "Keep current" (stop is appropriately positioned)
+The guidance checks your stop-loss price in this order:
+1. If `stop-loss > current price`: Shows "⚠️ Above current" (warning - can't set stop above current at most brokers)
+2. If `stop-loss < SMA`: Suggests "Raise stop" (price has support from SMA, you could tighten)
+3. If `stop-loss >= SMA`: Suggests "Keep current" (stop is appropriately positioned)
 
 **When it makes sense:**
 - ✅ **Simple mode**: If price is trending above SMA, you might tighten your stop
@@ -195,10 +197,12 @@ The guidance compares your calculated stop-loss price to the 50-day SMA:
 - ✅ **ATR mode**: If price respects SMA support, consider tighter stop
 
 **Limitations:**
-- ⚠️ **52-week high mode**: Guidance may be misleading when stop-loss is above current price
 - ⚠️ Assumes SMA acts as support (technical analysis assumption, not always true)
 - ⚠️ Only available when 50+ days of historical data exists
 - ⚠️ Should be used as a suggestion, not a rule - always consider your own risk tolerance
+
+**Special case - 52-week high mode:**
+When using `--week52-high`, the stop-loss may be above the current price. The guidance will show "⚠️ Above current" in red to warn you. This indicates a very conservative position where you'd exit immediately unless the price recovers toward the 52-week high. Most brokers don't allow setting stop-losses above the current price.
 
 **Example:**
 ```

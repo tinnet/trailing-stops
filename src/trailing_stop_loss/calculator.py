@@ -37,10 +37,14 @@ class StopLossResult:
         """Get guidance on whether to update stop-loss based on SMA.
 
         Uses 50-day SMA as a sanity check:
+        - If stop > current: Warning - stop would trigger immediately
         - If stop < SMA: Price above support, raise stop to lock gains
         - If stop > SMA: Stop is appropriately positioned, keep current
         """
-        if self.sma_50 is None:
+        # Check if stop-loss is above current price (would trigger immediately)
+        if self.stop_loss_price > self.current_price:
+            return "⚠️ Above current"
+        elif self.sma_50 is None:
             return "N/A"
         elif self.stop_loss_price < self.sma_50:
             return "Raise stop"

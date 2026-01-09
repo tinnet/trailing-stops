@@ -276,3 +276,40 @@ def test_atr_stop_loss_without_base_price_default(
     assert result.stop_loss_price == pytest.approx(expected_stop)  # 130.0
     assert result.dollar_risk == pytest.approx(20.0)  # 150 - 130
     assert result.week_52_high is None
+
+
+def test_guidance_when_stop_above_current(
+    calculator: StopLossCalculator, sample_stock_price: StockPrice
+) -> None:
+    """Test that guidance shows warning when stop-loss is above current price."""
+    # Use 52-week high mode with high base price to create stop > current scenario
+    result = calculator.calculate_simple(
+        sample_stock_price, 5.0, sma_50=140.0, base_price=180.0
+    )
+
+    # Stop-loss should be above current price
+    assert result.stop_loss_price == pytest.approx(171.0)  # 180 * 0.95
+    assert result.current_price == 150.0
+    assert result.stop_loss_price > result.current_price
+
+    # Guidance should show warning, not SMA-based guidance
+    assert result.formatted_guidance == "⚠️ Above current"
+
+
+def test_guidance_normal_behavior(
+    calculator: StopLossCalculator, sample_stock_price: StockPrice
+) -> None:
+    """Test that guidance works normally when stop-loss is below current price."""
+    # Normal case: stop below SMA
+    result1 = calculator.calculate_simple(sample_stock_price, 5.0, sma_50=145.0)
+    assert result1.stop_loss_price == pytest.approx(142.5)
+    assert result1.formatted_guidance == "Raise stop"
+
+    # Normal case: stop above SMA
+    result2 = calculator.calculate_simple(sample_stock_price, 5.0, sma_50=140.0)
+    assert result2.stop_loss_price == pytest.approx(142.5)
+    assert result2.formatted_guidance == "Keep current"
+
+    # No SMA available
+    result3 = calculator.calculate_simple(sample_stock_price, 5.0)
+    assert result3.formatted_guidance == "N/A"
