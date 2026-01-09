@@ -37,10 +37,19 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
         if not isinstance(result, Exception)
     )
 
+    # Check if any results have entry price data
+    has_entry = any(
+        hasattr(result, "entry_price") and result.entry_price is not None
+        for _, result in results
+        if not isinstance(result, Exception)
+    )
+
     table = Table(title="Stop-Loss Calculator Results", show_header=True, header_style="bold cyan")
 
     table.add_column("Ticker", style="bold", justify="left")
     table.add_column("Current Price", justify="right")
+    if has_entry:
+        table.add_column("Entry Price", justify="right")
     if has_52week:
         table.add_column("52-Week High", justify="right")
     table.add_column("50-Day SMA", justify="right")
@@ -58,6 +67,8 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
                 stock_price.ticker if hasattr(stock_price, "ticker") else "?",
                 "[red]ERROR[/red]",
             ]
+            if has_entry:
+                row_data.append("[red]N/A[/red]")
             if has_52week:
                 row_data.append("[red]N/A[/red]")
             row_data.extend([
@@ -98,6 +109,11 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
                 result.ticker,
                 f"{result.currency} {result.current_price:.2f}",
             ]
+            if has_entry:
+                if result.entry_price is not None:
+                    row_data.append(f"[magenta]{result.currency} {result.entry_price:.2f}[/magenta]")
+                else:
+                    row_data.append("N/A")
             if has_52week:
                 if result.week_52_high is not None:
                     row_data.append(f"[cyan]{result.currency} {result.week_52_high:.2f}[/cyan]")
