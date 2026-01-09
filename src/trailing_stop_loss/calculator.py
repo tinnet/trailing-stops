@@ -30,6 +30,7 @@ class StopLossResult:
     sma_50: float | None = None  # 50-day simple moving average (for display only)
     atr_value: float | None = None  # ATR value (for ATR mode display)
     atr_multiplier: float | None = None  # ATR multiplier (for ATR mode display)
+    week_52_high: float | None = None  # 52-week high (for display only)
 
     @property
     def formatted_guidance(self) -> str:
@@ -75,14 +76,19 @@ class StopLossCalculator:
         self._high_water_marks: dict[str, float] = {}
 
     def calculate_simple(
-        self, stock_price: StockPrice, percentage: float, sma_50: float | None = None
+        self,
+        stock_price: StockPrice,
+        percentage: float,
+        sma_50: float | None = None,
+        base_price: float | None = None,
     ) -> StopLossResult:
-        """Calculate simple stop-loss (percentage below current price).
+        """Calculate simple stop-loss (percentage below current or base price).
 
         Args:
             stock_price: Current stock price information.
             percentage: Stop-loss percentage (0-100).
             sma_50: Optional 50-day simple moving average (for display only).
+            base_price: Optional base price (e.g., 52-week high) to use instead of current price.
 
         Returns:
             StopLossResult with calculated stop-loss price.
@@ -93,7 +99,9 @@ class StopLossCalculator:
         if not 0 < percentage < 100:
             raise ValueError(f"Percentage must be between 0 and 100, got {percentage}")
 
-        stop_loss_price = stock_price.current_price * (1 - percentage / 100)
+        # Use base_price if provided, otherwise use current price
+        calculation_base = base_price if base_price is not None else stock_price.current_price
+        stop_loss_price = calculation_base * (1 - percentage / 100)
         dollar_risk = stock_price.current_price - stop_loss_price
 
         return StopLossResult(
@@ -105,6 +113,7 @@ class StopLossCalculator:
             currency=stock_price.currency,
             dollar_risk=dollar_risk,
             sma_50=sma_50,
+            week_52_high=base_price if base_price is not None else None,
         )
 
     def calculate_trailing(
@@ -159,6 +168,7 @@ class StopLossCalculator:
             currency=stock_price.currency,
             dollar_risk=dollar_risk,
             sma_50=sma_50,
+            week_52_high=None,
         )
 
     def calculate(
