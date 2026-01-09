@@ -458,6 +458,10 @@ print(f"ATR: ${atr_result.stop_loss_price:.2f} (${atr_result.dollar_risk:.2f} ri
 - **pytest**: Testing framework
 - **ruff**: Fast Python linter and formatter
 
+## Disclaimer
+
+The information provided by this tool is for educational purposes only and does not constitute financial advice. Always do your own research and consult a qualified financial advisor before making investment decisions.
+
 ## License
 
 MIT

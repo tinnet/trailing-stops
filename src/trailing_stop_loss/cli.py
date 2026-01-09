@@ -368,6 +368,10 @@ def calculate(
         table = create_results_table(results)
         console.print()
         console.print(table)
+        console.print(
+            "\n[italic yellow]Disclaimer: This tool is for educational purposes only and "
+            "does not constitute financial advice.[/italic yellow]"
+        )
         console.print()
 
         # Summary
