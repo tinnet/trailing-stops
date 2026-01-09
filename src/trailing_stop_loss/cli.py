@@ -114,7 +114,7 @@ def calculate(
     ] = False,
     atr_period: Annotated[
         int,
-        typer.Option("--atr-period", help="ATR calculation period (days)"),
+        typer.Option("--atr-period", help="ATR calculation period (trading days)"),
     ] = 14,
     atr_multiplier: Annotated[
         float,
