@@ -161,6 +161,10 @@ def calculate(
         bool,
         typer.Option("--week52-high", "-w", help="Base calculations on 52-week high instead of current price"),
     ] = False,
+    no_disclaimer: Annotated[
+        bool,
+        typer.Option("--no-disclaimer", help="Do not show the disclaimer message."),
+    ] = False,
 ) -> None:
     """Calculate stop-loss prices for configured tickers.
 
@@ -368,10 +372,12 @@ def calculate(
         table = create_results_table(results)
         console.print()
         console.print(table)
-        console.print(
-            "\n[italic yellow]Disclaimer: This tool is for educational purposes only and "
-            "does not constitute financial advice.[/italic yellow]"
-        )
+        if not no_disclaimer:
+            console.print()
+            console.print(
+                "[italic yellow]Disclaimer: This tool is for educational purposes only and "
+                "does not constitute financial advice.[/italic yellow]"
+            )
 
 
     except FileNotFoundError as e:
