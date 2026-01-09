@@ -101,12 +101,15 @@ Customize ATR parameters:
 ```bash
 # Use tighter stop (1.5× ATR)
 uv run stop-loss calculate --atr --atr-multiplier 1.5
+uv run stop-loss calculate -a -m 1.5  # short form
 
 # Use looser stop (3× ATR)
 uv run stop-loss calculate --atr --atr-multiplier 3.0
+uv run stop-loss calculate -a -m 3.0  # short form
 
 # Change ATR period (default 14 days)
 uv run stop-loss calculate --atr --atr-period 20
+uv run stop-loss calculate -a -P 20  # short form
 ```
 
 ### Simple Stop-Loss
@@ -137,11 +140,11 @@ Base stop-loss calculations on the 52-week high instead of current price (more c
 
 ```bash
 # Simple mode with 52-week high (8% below peak)
-uv run stop-loss calculate --use-52week-high --simple -p 8
+uv run stop-loss calculate --week52-high --simple -p 8
 uv run stop-loss calculate -w --simple -p 8  # short flag
 
 # ATR mode with 52-week high
-uv run stop-loss calculate --use-52week-high --atr
+uv run stop-loss calculate --week52-high --atr
 uv run stop-loss calculate -w --atr  # short flag
 
 # Works with multiple tickers
@@ -160,13 +163,32 @@ Calculate from a specific date (useful if you bought at a known date):
 
 ```bash
 uv run stop-loss calculate --trailing --since 2024-01-15
+uv run stop-loss calculate -t -d 2024-01-15  # short form
 ```
 
 Skip historical data fetching (use only in-memory tracking):
 
 ```bash
 uv run stop-loss calculate --trailing --no-history
+uv run stop-loss calculate -t -H  # short form
 ```
+
+### CLI Flag Reference
+
+All flags with their short forms:
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--config` | `-c` | Path to configuration file |
+| `--percentage` | `-p` | Stop-loss percentage (0-100) |
+| `--simple` | `-s` | Use simple stop-loss mode |
+| `--trailing` | `-t` | Use trailing stop-loss mode |
+| `--atr` | `-a` | Use ATR-based stop-loss mode |
+| `--atr-period` | `-P` | ATR calculation period in trading days (default: 14) |
+| `--atr-multiplier` | `-m` | ATR multiplier for stop distance (default: 2.0) |
+| `--since` | `-d` | Start date for trailing calculation (YYYY-MM-DD) |
+| `--no-history` | `-H` | Skip historical data fetching |
+| `--week52-high` | `-w` | Base calculations on 52-week high |
 
 ### Version Info
 

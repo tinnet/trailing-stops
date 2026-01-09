@@ -137,23 +137,23 @@ def calculate(
     ] = False,
     atr_period: Annotated[
         int,
-        typer.Option("--atr-period", help="ATR calculation period (trading days)"),
+        typer.Option("--atr-period", "-P", help="ATR calculation period (trading days)"),
     ] = 14,
     atr_multiplier: Annotated[
         float,
-        typer.Option("--atr-multiplier", help="ATR multiplier for stop-loss distance"),
+        typer.Option("--atr-multiplier", "-m", help="ATR multiplier for stop-loss distance"),
     ] = 2.0,
     since: Annotated[
         str | None,
-        typer.Option("--since", help="Start date for trailing calculation (YYYY-MM-DD)"),
+        typer.Option("--since", "-d", help="Start date for trailing calculation (YYYY-MM-DD)"),
     ] = None,
     no_history: Annotated[
         bool,
-        typer.Option("--no-history", help="Skip historical data fetching"),
+        typer.Option("--no-history", "-H", help="Skip historical data fetching"),
     ] = False,
-    use_52week_high: Annotated[
+    week52_high: Annotated[
         bool,
-        typer.Option("--use-52week-high", "-w", help="Base calculations on 52-week high instead of current price"),
+        typer.Option("--week52-high", "-w", help="Base calculations on 52-week high instead of current price"),
     ] = False,
 ) -> None:
     """Calculate stop-loss prices for configured tickers.
@@ -165,7 +165,7 @@ def calculate(
         uv run stop-loss calculate TSLA -p 10 --simple
         uv run stop-loss calculate --trailing --since 2024-01-01
         uv run stop-loss calculate --atr --atr-multiplier 2.5
-        uv run stop-loss calculate --use-52week-high --simple -p 8
+        uv run stop-loss calculate --week52-high --simple -p 8
         uv run stop-loss calculate -w --atr
     """
     try:
@@ -289,7 +289,7 @@ def calculate(
 
         # Fetch 52-week high values if flag is set
         week_52_highs: dict[str, float | None] = {}
-        if use_52week_high and history_db:
+        if week52_high and history_db:
             for ticker in price_results.keys():
                 week_52_highs[ticker] = history_db.get_latest_52week_high(ticker)
         else:
@@ -305,7 +305,7 @@ def calculate(
                 try:
                     # Get SMA and 52-week high for this ticker
                     sma_50 = sma_values.get(ticker)
-                    base_price = week_52_highs.get(ticker) if use_52week_high else None
+                    base_price = week_52_highs.get(ticker) if week52_high else None
 
                     if use_mode == "atr":
                         # ATR mode: calculate ATR from historical data
