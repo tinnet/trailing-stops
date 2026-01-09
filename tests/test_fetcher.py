@@ -90,3 +90,27 @@ def test_ticker_normalization(fetcher: PriceFetcher) -> None:
     """Test that tickers are normalized to uppercase."""
     stock_price = fetcher.fetch_price("aapl")
     assert stock_price.ticker == "AAPL"
+
+
+def test_fetch_52week_high_low(fetcher: PriceFetcher) -> None:
+    """Test that 52-week high and low are fetched.
+
+    Note: This is an integration test that makes real API calls.
+    """
+    stock_price = fetcher.fetch_price("AAPL")
+
+    # Check that 52-week high/low are present (should be numbers or None)
+    assert stock_price.week_52_high is None or isinstance(stock_price.week_52_high, (int, float))
+    assert stock_price.week_52_low is None or isinstance(stock_price.week_52_low, (int, float))
+
+    # If they exist, verify they're reasonable
+    if stock_price.week_52_high is not None:
+        assert stock_price.week_52_high > 0
+        # 52-week high should be >= current price (or close to it)
+        # Allow some tolerance for intraday changes
+        assert stock_price.week_52_high >= stock_price.current_price * 0.5
+
+    if stock_price.week_52_low is not None:
+        assert stock_price.week_52_low > 0
+        # 52-week low should be <= current price (or close to it)
+        assert stock_price.week_52_low <= stock_price.current_price * 2.0

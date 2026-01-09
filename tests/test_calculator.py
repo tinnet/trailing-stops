@@ -214,3 +214,65 @@ def test_calculate_atr_stop_loss_invalid_multiplier(
     """Test ATR stop-loss with invalid multiplier."""
     with pytest.raises(ValueError, match="ATR multiplier must be positive"):
         calculator.calculate_atr_stop_loss(sample_stock_price, 5.0, 10.0, atr_multiplier=0.0)
+
+
+def test_simple_stop_loss_with_base_price(
+    calculator: StopLossCalculator, sample_stock_price: StockPrice
+) -> None:
+    """Test simple stop-loss calculation with base price (52-week high mode)."""
+    # 52-week high is $180, current price is $150
+    result = calculator.calculate_simple(sample_stock_price, 10.0, base_price=180.0)
+
+    # Stop-loss should be 10% below base price (180)
+    assert result.stop_loss_price == pytest.approx(162.0)  # 180 * 0.90
+    # Dollar risk is still relative to current price
+    assert result.dollar_risk == pytest.approx(-12.0)  # 150 - 162 (negative when current < stop)
+    # Base price should be stored in result
+    assert result.week_52_high == 180.0
+    assert result.stop_loss_type == StopLossType.SIMPLE
+
+
+def test_atr_stop_loss_with_base_price(
+    calculator: StopLossCalculator, sample_stock_price: StockPrice
+) -> None:
+    """Test ATR stop-loss calculation with base price (52-week high mode)."""
+    # 52-week high is $180, current price is $150, ATR is $10
+    atr = 10.0
+    result = calculator.calculate_atr_stop_loss(
+        sample_stock_price, 5.0, atr, atr_multiplier=2.0, base_price=180.0
+    )
+
+    # Stop-loss should be base price - (ATR × multiplier)
+    expected_stop = 180.0 - (10.0 * 2.0)
+    assert result.stop_loss_price == pytest.approx(expected_stop)  # 160.0
+    # Dollar risk is still relative to current price
+    assert result.dollar_risk == pytest.approx(-10.0)  # 150 - 160
+    # Base price should be stored in result
+    assert result.week_52_high == 180.0
+    assert result.stop_loss_type == StopLossType.ATR
+
+
+def test_simple_stop_loss_without_base_price_default(
+    calculator: StopLossCalculator, sample_stock_price: StockPrice
+) -> None:
+    """Test that simple stop-loss without base_price behaves as before."""
+    result = calculator.calculate_simple(sample_stock_price, 10.0)
+
+    # Stop-loss should be based on current price
+    assert result.stop_loss_price == pytest.approx(135.0)  # 150 * 0.90
+    assert result.dollar_risk == pytest.approx(15.0)  # 150 - 135
+    assert result.week_52_high is None
+
+
+def test_atr_stop_loss_without_base_price_default(
+    calculator: StopLossCalculator, sample_stock_price: StockPrice
+) -> None:
+    """Test that ATR stop-loss without base_price behaves as before."""
+    atr = 10.0
+    result = calculator.calculate_atr_stop_loss(sample_stock_price, 5.0, atr, atr_multiplier=2.0)
+
+    # Stop-loss should be based on current price
+    expected_stop = 150.0 - (10.0 * 2.0)
+    assert result.stop_loss_price == pytest.approx(expected_stop)  # 130.0
+    assert result.dollar_risk == pytest.approx(20.0)  # 150 - 130
+    assert result.week_52_high is None
