@@ -30,10 +30,19 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
     Returns:
         Formatted rich Table.
     """
+    # Check if any results have 52-week high data
+    has_52week = any(
+        hasattr(result, "week_52_high") and result.week_52_high is not None
+        for _, result in results
+        if not isinstance(result, Exception)
+    )
+
     table = Table(title="Stop-Loss Calculator Results", show_header=True, header_style="bold cyan")
 
     table.add_column("Ticker", style="bold", justify="left")
     table.add_column("Current Price", justify="right")
+    if has_52week:
+        table.add_column("52-Week High", justify="right")
     table.add_column("50-Day SMA", justify="right")
     table.add_column("Stop-Loss Price", justify="right")
     table.add_column("Type", justify="center")
@@ -45,16 +54,21 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
         from trailing_stop_loss.calculator import StopLossResult
 
         if isinstance(result, Exception):
-            table.add_row(
+            row_data = [
                 stock_price.ticker if hasattr(stock_price, "ticker") else "?",
                 "[red]ERROR[/red]",
+            ]
+            if has_52week:
+                row_data.append("[red]N/A[/red]")
+            row_data.extend([
                 "[red]N/A[/red]",
                 "[red]N/A[/red]",
                 "[red]N/A[/red]",
                 "[red]N/A[/red]",
                 f"[red]{str(result)[:30]}[/red]",
                 "[red]N/A[/red]",
-            )
+            ])
+            table.add_row(*row_data)
         elif isinstance(result, StopLossResult):
             if result.stop_loss_type.value == "trailing":
                 type_str = "🔄 Trailing"
@@ -73,16 +87,25 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
             else:
                 guidance_str = result.formatted_guidance
 
-            table.add_row(
+            # Build row data
+            row_data = [
                 result.ticker,
                 f"{result.currency} {result.current_price:.2f}",
+            ]
+            if has_52week:
+                if result.week_52_high is not None:
+                    row_data.append(f"[cyan]{result.currency} {result.week_52_high:.2f}[/cyan]")
+                else:
+                    row_data.append("N/A")
+            row_data.extend([
                 result.formatted_sma,
                 f"[{price_color}]{result.currency} {result.stop_loss_price:.2f}[/{price_color}]",
                 type_str,
                 result.formatted_percentage,
                 result.formatted_risk,
                 guidance_str,
-            )
+            ])
+            table.add_row(*row_data)
 
     return table
 
@@ -128,6 +151,10 @@ def calculate(
         bool,
         typer.Option("--no-history", help="Skip historical data fetching"),
     ] = False,
+    use_52week_high: Annotated[
+        bool,
+        typer.Option("--use-52week-high", "-w", help="Base calculations on 52-week high instead of current price"),
+    ] = False,
 ) -> None:
     """Calculate stop-loss prices for configured tickers.
 
@@ -138,6 +165,8 @@ def calculate(
         uv run stop-loss calculate TSLA -p 10 --simple
         uv run stop-loss calculate --trailing --since 2024-01-01
         uv run stop-loss calculate --atr --atr-multiplier 2.5
+        uv run stop-loss calculate --use-52week-high --simple -p 8
+        uv run stop-loss calculate -w --atr
     """
     try:
         # Load configuration
@@ -258,6 +287,15 @@ def calculate(
             for ticker in price_results.keys():
                 sma_values[ticker] = None
 
+        # Fetch 52-week high values if flag is set
+        week_52_highs: dict[str, float | None] = {}
+        if use_52week_high and history_db:
+            for ticker in price_results.keys():
+                week_52_highs[ticker] = history_db.get_latest_52week_high(ticker)
+        else:
+            for ticker in price_results.keys():
+                week_52_highs[ticker] = None
+
         # Calculate stop-losses
         results: list[tuple[StockPrice | str, object]] = []
         for ticker, price_or_error in price_results.items():
@@ -265,8 +303,10 @@ def calculate(
                 results.append((ticker, price_or_error))
             else:
                 try:
-                    # Get SMA for this ticker
+                    # Get SMA and 52-week high for this ticker
                     sma_50 = sma_values.get(ticker)
+                    base_price = week_52_highs.get(ticker) if use_52week_high else None
+
                     if use_mode == "atr":
                         # ATR mode: calculate ATR from historical data
                         if history_db:
@@ -274,7 +314,7 @@ def calculate(
                                 history_df = history_db.get_recent_history_df(ticker, atr_period + 1)
                                 atr_value = calculator.calculate_atr(history_df, atr_period)
                                 stop_loss = calculator.calculate_atr_stop_loss(
-                                    price_or_error, pct, atr_value, atr_multiplier, sma_50
+                                    price_or_error, pct, atr_value, atr_multiplier, sma_50, base_price
                                 )
                             except ValueError as e:
                                 # Not enough historical data - try to fetch it now
@@ -292,7 +332,7 @@ def calculate(
                                     history_df = history_db.get_recent_history_df(ticker, atr_period + 1)
                                     atr_value = calculator.calculate_atr(history_df, atr_period)
                                     stop_loss = calculator.calculate_atr_stop_loss(
-                                        price_or_error, pct, atr_value, atr_multiplier, sma_50
+                                        price_or_error, pct, atr_value, atr_multiplier, sma_50, base_price
                                     )
                                 except Exception as retry_error:
                                     results.append((price_or_error, ValueError(f"Cannot fetch enough data: {retry_error}")))
@@ -311,7 +351,7 @@ def calculate(
                     else:
                         # Simple mode
                         stop_loss = calculator.calculate_simple(
-                            price_or_error, pct, sma_50=sma_50
+                            price_or_error, pct, sma_50=sma_50, base_price=base_price
                         )
 
                     results.append((price_or_error, stop_loss))
