@@ -32,6 +32,8 @@ class PriceHistoryDB:
                     low REAL,
                     close REAL NOT NULL,
                     volume INTEGER,
+                    week_52_high REAL,
+                    week_52_low REAL,
                     PRIMARY KEY (ticker, date)
                 )
             """)
@@ -39,6 +41,15 @@ class PriceHistoryDB:
                 CREATE INDEX IF NOT EXISTS idx_ticker_date
                 ON price_history(ticker, date)
             """)
+
+            # Migrate existing database: add 52-week columns if they don't exist
+            cursor = conn.execute("PRAGMA table_info(price_history)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if "week_52_high" not in columns:
+                conn.execute("ALTER TABLE price_history ADD COLUMN week_52_high REAL")
+            if "week_52_low" not in columns:
+                conn.execute("ALTER TABLE price_history ADD COLUMN week_52_low REAL")
+
             conn.commit()
 
     def store_history(self, ticker: str, history_df: pd.DataFrame) -> int:
@@ -85,7 +96,12 @@ class PriceHistoryDB:
             return cursor.rowcount
 
     def store_current_price(
-        self, ticker: str, price: float, timestamp: datetime | None = None
+        self,
+        ticker: str,
+        price: float,
+        timestamp: datetime | None = None,
+        week_52_high: float | None = None,
+        week_52_low: float | None = None,
     ) -> bool:
         """Store current price as today's data point.
 
@@ -93,6 +109,8 @@ class PriceHistoryDB:
             ticker: Stock ticker symbol.
             price: Current price (used as high, low, and close).
             timestamp: Timestamp of the price (defaults to now).
+            week_52_high: 52-week high price (optional).
+            week_52_low: 52-week low price (optional).
 
         Returns:
             True if inserted, False if already exists for today.
@@ -105,11 +123,11 @@ class PriceHistoryDB:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
                 """
-                INSERT OR IGNORE INTO price_history
-                (ticker, date, open, high, low, close, volume)
-                VALUES (?, ?, ?, ?, ?, ?, NULL)
+                INSERT OR REPLACE INTO price_history
+                (ticker, date, open, high, low, close, volume, week_52_high, week_52_low)
+                VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)
                 """,
-                (ticker.upper(), date_str, price, price, price, price),
+                (ticker.upper(), date_str, price, price, price, price, week_52_high, week_52_low),
             )
             conn.commit()
             return cursor.rowcount > 0
@@ -264,3 +282,26 @@ class PriceHistoryDB:
             df = df.sort_index()
 
             return df
+
+    def get_latest_52week_high(self, ticker: str) -> float | None:
+        """Get the most recent 52-week high value for a ticker.
+
+        Args:
+            ticker: Stock ticker symbol.
+
+        Returns:
+            Most recent 52-week high value, or None if no data exists.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT week_52_high
+                FROM price_history
+                WHERE ticker = ? AND week_52_high IS NOT NULL
+                ORDER BY date DESC
+                LIMIT 1
+                """,
+                (ticker.upper(),),
+            )
+            result = cursor.fetchone()
+            return result[0] if result and result[0] is not None else None

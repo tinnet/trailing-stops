@@ -230,7 +230,11 @@ def calculate(
             for ticker, price_or_error in price_results.items():
                 if not isinstance(price_or_error, Exception):
                     history_db.store_current_price(
-                        ticker, price_or_error.current_price, price_or_error.timestamp
+                        ticker,
+                        price_or_error.current_price,
+                        price_or_error.timestamp,
+                        price_or_error.week_52_high,
+                        price_or_error.week_52_low,
                     )
 
         # Calculate 50-day SMA for all tickers

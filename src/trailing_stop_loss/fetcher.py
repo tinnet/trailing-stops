@@ -16,6 +16,8 @@ class StockPrice:
     currency: str
     timestamp: datetime
     previous_close: float | None = None
+    week_52_high: float | None = None
+    week_52_low: float | None = None
 
 
 class PriceFetcher:
@@ -61,6 +63,8 @@ class PriceFetcher:
                 currency=info.get("currency", "USD"),
                 timestamp=datetime.now(),
                 previous_close=info.get("previousClose"),
+                week_52_high=info.get("fiftyTwoWeekHigh"),
+                week_52_low=info.get("fiftyTwoWeekLow"),
             )
 
             self._cache[ticker] = stock_price
