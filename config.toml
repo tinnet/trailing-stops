@@ -1,12 +1,21 @@
 # Trailing Stop-Loss Configuration
 
 # List of ticker symbols to track
+# Format: "TICKER" or "TICKER:PRICE" (where PRICE is your entry price)
 tickers = [
-    "AAPL",
-    "AMD",
-    "SHOP.TO",
-    "NVDA",
+    "AAPL",         # Uses current price
+    "AMD",          # Uses current price
+    "SHOP.TO",      # Uses current price
+    "NVDA",         # Uses current price
 ]
+
+# Example with entry prices:
+# tickers = [
+#     "AAPL:150.50",    # Entry price $150.50
+#     "AMD:180",        # Entry price $180
+#     "SHOP.TO:200",    # Entry price $200 CAD
+#     "NVDA",           # No entry price - uses current price
+# ]
 
 # Default stop-loss percentage (0-100)
 # This is the percentage below the current price (simple) or high-water mark (trailing)

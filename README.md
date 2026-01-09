@@ -78,6 +78,45 @@ uv run stop-loss calculate --percentage 7.5
 uv run stop-loss calculate -p 10
 ```
 
+### Entry Price Support
+
+Specify your entry price for more accurate stop-loss calculations based on your actual cost basis:
+
+```bash
+# CLI with entry prices (format: TICKER:PRICE)
+uv run stop-loss calculate AAPL:150 GOOGL:2800 SHOP.TO:200 --simple -p 8
+
+# Mixed format (some with entry prices, some without)
+uv run stop-loss calculate AAPL:150 NVDA  # NVDA uses current price
+
+# Works with all modes
+uv run stop-loss calculate AAPL:175.50 --trailing -p 5
+uv run stop-loss calculate AAPL:150 --atr
+```
+
+**How it works:**
+- **Simple/ATR modes**: Entry price becomes the calculation base (overrides 52-week high)
+- **Trailing mode**: Entry price sets the minimum high water mark (`max(db_hwm, entry_price)`)
+- **Mixed usage**: Tickers without entry prices use current price or database high water mark
+- Currency auto-detected from ticker (ensure your price matches)
+
+**Example with Simple mode:**
+```bash
+$ uv run stop-loss calculate AAPL:180 --simple -p 8
+
+Ticker  Current Price  Entry Price  Stop-Loss Price  Risk/Share
+AAPL    $150.00       $180.00      $165.60          -$15.60
+```
+
+**Entry Price in Config:**
+```toml
+tickers = [
+    "AAPL:150.50",   # Entry price $150.50
+    "SHOP.TO:200",   # Entry price $200 CAD
+    "NVDA",          # No entry - uses current price
+]
+```
+
 ### Trailing Stop-Loss
 
 Enable trailing stop-loss (tracks high-water mark):
