@@ -1,6 +1,6 @@
 """Stock price fetching using yfinance."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 
 import pandas as pd
@@ -46,9 +46,9 @@ class PriceFetcher:
         """
         if use_cache and ticker in self._cache:
             cached = self._cache[ticker]
-            # Update entry price in cached result if provided
+            # Return a copy with updated entry price if provided
             if entry_price is not None:
-                cached.entry_price = entry_price
+                return replace(cached, entry_price=entry_price)
             return cached
 
         try:
@@ -83,7 +83,7 @@ class PriceFetcher:
             raise ValueError(f"Failed to fetch price for {ticker}: {e}") from e
 
     def fetch_multiple(
-        self, tickers: list[str] | list[tuple[str, float | None]], skip_errors: bool = True
+        self, tickers: list[str | tuple[str, float | None]], skip_errors: bool = True
     ) -> dict[str, StockPrice | Exception]:
         """Fetch prices for multiple tickers.
 
