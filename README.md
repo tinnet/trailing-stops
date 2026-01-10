@@ -250,6 +250,29 @@ This project uses `mise` for Python version management:
 mise install python@3.14
 ```
 
+### Development Tasks (mise)
+
+This project includes automated tasks via `mise` for common development workflows:
+
+```bash
+# Run tests with coverage
+mise run test
+
+# Format code with ruff
+mise run format
+
+# Lint code with ruff
+mise run lint
+
+# Check types with ty
+mise run typecheck
+
+# Run all checks (lint + typecheck + test)
+mise run check
+```
+
+All tasks use `uv` under the hood, so dependencies are automatically managed.
+
 ### Running Tests
 
 ```bash
@@ -268,9 +291,18 @@ uv run pytest tests/test_calculator.py
 ```bash
 # Format code
 uv run ruff format
+# Or with mise
+mise run format
 
 # Lint code
 uv run ruff check
+# Or with mise
+mise run lint
+
+# Check types
+uv run ty check
+# Or with mise
+mise run typecheck
 
 # Fix linting issues
 uv run ruff check --fix
@@ -457,6 +489,7 @@ print(f"ATR: ${atr_result.stop_loss_price:.2f} (${atr_result.dollar_risk:.2f} ri
 - **rich**: Beautiful terminal output
 - **pytest**: Testing framework
 - **ruff**: Fast Python linter and formatter
+- **ty**: Extremely fast Python type checker
 
 ## Disclaimer
 
