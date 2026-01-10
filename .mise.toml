@@ -1,0 +1,22 @@
+[tools]
+python = "3.14"
+
+[tasks.test]
+description = "Run tests with pytest"
+run = "uv run pytest"
+
+[tasks.format]
+description = "Format code with ruff"
+run = "uv run ruff format ."
+
+[tasks.lint]
+description = "Lint code with ruff"
+run = "uv run ruff check ."
+
+[tasks.typecheck]
+description = "Check types with ty"
+run = "uv run ty check"
+
+[tasks.check]
+description = "Run all checks (lint, typecheck, test)"
+depends = ["lint", "typecheck", "test"]

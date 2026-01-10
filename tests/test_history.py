@@ -152,9 +152,7 @@ def test_multiple_tickers(temp_db: PriceHistoryDB, sample_history_df: pd.DataFra
 
 def test_store_current_price_with_52week_high(temp_db: PriceHistoryDB) -> None:
     """Test storing current price with 52-week high/low values."""
-    success = temp_db.store_current_price(
-        "AAPL", 150.0, week_52_high=180.0, week_52_low=120.0
-    )
+    success = temp_db.store_current_price("AAPL", 150.0, week_52_high=180.0, week_52_low=120.0)
     assert success
     assert temp_db.has_data("AAPL")
 
@@ -166,15 +164,9 @@ def test_store_current_price_with_52week_high(temp_db: PriceHistoryDB) -> None:
 def test_get_latest_52week_high(temp_db: PriceHistoryDB) -> None:
     """Test getting latest 52-week high value."""
     # Store multiple days with different 52-week highs
-    temp_db.store_current_price(
-        "AAPL", 150.0, datetime(2024, 1, 1), week_52_high=180.0
-    )
-    temp_db.store_current_price(
-        "AAPL", 155.0, datetime(2024, 1, 2), week_52_high=185.0
-    )
-    temp_db.store_current_price(
-        "AAPL", 160.0, datetime(2024, 1, 3), week_52_high=190.0
-    )
+    temp_db.store_current_price("AAPL", 150.0, datetime(2024, 1, 1), week_52_high=180.0)
+    temp_db.store_current_price("AAPL", 155.0, datetime(2024, 1, 2), week_52_high=185.0)
+    temp_db.store_current_price("AAPL", 160.0, datetime(2024, 1, 3), week_52_high=190.0)
 
     # Should return the most recent 52-week high
     week_52_high = temp_db.get_latest_52week_high("AAPL")
@@ -191,9 +183,7 @@ def test_get_latest_52week_high_with_none_values(temp_db: PriceHistoryDB) -> Non
     """Test getting 52-week high when some entries have None values."""
     # Store entries with and without 52-week high
     temp_db.store_current_price("AAPL", 150.0, datetime(2024, 1, 1))  # No 52-week high
-    temp_db.store_current_price(
-        "AAPL", 155.0, datetime(2024, 1, 2), week_52_high=185.0
-    )
+    temp_db.store_current_price("AAPL", 155.0, datetime(2024, 1, 2), week_52_high=185.0)
 
     # Should return the most recent non-None value
     week_52_high = temp_db.get_latest_52week_high("AAPL")
@@ -208,9 +198,7 @@ def test_store_current_price_replaces_existing(temp_db: PriceHistoryDB) -> None:
     temp_db.store_current_price("AAPL", 150.0, timestamp, week_52_high=180.0)
 
     # Store updated price for same day
-    success = temp_db.store_current_price(
-        "AAPL", 155.0, timestamp, week_52_high=185.0
-    )
+    success = temp_db.store_current_price("AAPL", 155.0, timestamp, week_52_high=185.0)
     assert success
 
     # Should have the updated value

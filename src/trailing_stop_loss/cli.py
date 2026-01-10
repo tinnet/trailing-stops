@@ -60,14 +60,16 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
             ]
             if has_52week:
                 row_data.append("[red]N/A[/red]")
-            row_data.extend([
-                "[red]N/A[/red]",
-                "[red]N/A[/red]",
-                "[red]N/A[/red]",
-                "[red]N/A[/red]",
-                f"[red]{str(result)[:30]}[/red]",
-                "[red]N/A[/red]",
-            ])
+            row_data.extend(
+                [
+                    "[red]N/A[/red]",
+                    "[red]N/A[/red]",
+                    "[red]N/A[/red]",
+                    "[red]N/A[/red]",
+                    f"[red]{str(result)[:30]}[/red]",
+                    "[red]N/A[/red]",
+                ]
+            )
             table.add_row(*row_data)
         elif isinstance(result, StopLossResult):
             if result.stop_loss_type.value == "trailing":
@@ -103,14 +105,16 @@ def create_results_table(results: list[tuple[StockPrice, object]]) -> Table:
                     row_data.append(f"[cyan]{result.currency} {result.week_52_high:.2f}[/cyan]")
                 else:
                     row_data.append("N/A")
-            row_data.extend([
-                result.formatted_sma,
-                f"[{price_color}]{result.currency} {result.stop_loss_price:.2f}[/{price_color}]",
-                type_str,
-                result.formatted_percentage,
-                result.formatted_risk,
-                guidance_str,
-            ])
+            row_data.extend(
+                [
+                    result.formatted_sma,
+                    f"[{price_color}]{result.currency} {result.stop_loss_price:.2f}[/{price_color}]",
+                    type_str,
+                    result.formatted_percentage,
+                    result.formatted_risk,
+                    guidance_str,
+                ]
+            )
             table.add_row(*row_data)
 
     return table
@@ -159,7 +163,9 @@ def calculate(
     ] = False,
     week52_high: Annotated[
         bool,
-        typer.Option("--week52-high", "-w", help="Base calculations on 52-week high instead of current price"),
+        typer.Option(
+            "--week52-high", "-w", help="Base calculations on 52-week high instead of current price"
+        ),
     ] = False,
     no_disclaimer: Annotated[
         bool,
@@ -196,7 +202,9 @@ def calculate(
         # Determine calculation mode
         mode_count = sum([simple, trailing, atr])
         if mode_count > 1:
-            console.print("[red]Error: Only one mode (--simple, --trailing, --atr) can be specified.[/red]")
+            console.print(
+                "[red]Error: Only one mode (--simple, --trailing, --atr) can be specified.[/red]"
+            )
             raise typer.Exit(1)
 
         # Determine which mode to use
@@ -235,9 +243,7 @@ def calculate(
                         # Fetch only new data since last update
                         start_date = last_update + timedelta(days=1)
                         if start_date <= date.today():
-                            hist_data = fetcher.fetch_historical_data(
-                                ticker, start_date=start_date
-                            )
+                            hist_data = fetcher.fetch_historical_data(ticker, start_date=start_date)
                             rows = history_db.store_history(ticker, hist_data)
                             if rows > 0:
                                 console.print(
@@ -258,7 +264,9 @@ def calculate(
                             f"  [dim]Stored {rows} historical data points for {ticker}[/dim]"
                         )
                 except Exception as e:
-                    console.print(f"  [yellow]Warning: Could not fetch history for {ticker}: {e}[/yellow]")
+                    console.print(
+                        f"  [yellow]Warning: Could not fetch history for {ticker}: {e}[/yellow]"
+                    )
 
         # Fetch current prices
         console.print(f"[cyan]Fetching current prices for {len(ticker_list)} ticker(s)...[/cyan]")
@@ -321,34 +329,61 @@ def calculate(
                         # ATR mode: calculate ATR from historical data
                         if history_db:
                             try:
-                                history_df = history_db.get_recent_history_df(ticker, atr_period + 1)
+                                history_df = history_db.get_recent_history_df(
+                                    ticker, atr_period + 1
+                                )
                                 atr_value = calculator.calculate_atr(history_df, atr_period)
                                 stop_loss = calculator.calculate_atr_stop_loss(
-                                    price_or_error, pct, atr_value, atr_multiplier, sma_50, base_price
+                                    price_or_error,
+                                    pct,
+                                    atr_value,
+                                    atr_multiplier,
+                                    sma_50,
+                                    base_price,
                                 )
                             except ValueError as e:
                                 # Not enough historical data - try to fetch it now
-                                console.print(f"[yellow]Insufficient data for {ticker}, fetching historical data...[/yellow]")
+                                console.print(
+                                    f"[yellow]Insufficient data for {ticker}, fetching historical data...[/yellow]"
+                                )
                                 try:
                                     # Fetch enough data: ATR period needs trading days, so fetch ~3x calendar days
                                     # Plus buffer for weekends/holidays (minimum 6 months for safety)
                                     days_needed = max(atr_period * 3, 180)
                                     start = date.today() - timedelta(days=days_needed)
-                                    hist_data = fetcher.fetch_historical_data(ticker, start_date=start)
+                                    hist_data = fetcher.fetch_historical_data(
+                                        ticker, start_date=start
+                                    )
                                     rows = history_db.store_history(ticker, hist_data)
-                                    console.print(f"  [dim]Stored {rows} historical data points for {ticker}[/dim]")
+                                    console.print(
+                                        f"  [dim]Stored {rows} historical data points for {ticker}[/dim]"
+                                    )
 
                                     # Retry calculation
-                                    history_df = history_db.get_recent_history_df(ticker, atr_period + 1)
+                                    history_df = history_db.get_recent_history_df(
+                                        ticker, atr_period + 1
+                                    )
                                     atr_value = calculator.calculate_atr(history_df, atr_period)
                                     stop_loss = calculator.calculate_atr_stop_loss(
-                                        price_or_error, pct, atr_value, atr_multiplier, sma_50, base_price
+                                        price_or_error,
+                                        pct,
+                                        atr_value,
+                                        atr_multiplier,
+                                        sma_50,
+                                        base_price,
                                     )
                                 except Exception as retry_error:
-                                    results.append((price_or_error, ValueError(f"Cannot fetch enough data: {retry_error}")))
+                                    results.append(
+                                        (
+                                            price_or_error,
+                                            ValueError(f"Cannot fetch enough data: {retry_error}"),
+                                        )
+                                    )
                                     continue
                         else:
-                            results.append((price_or_error, ValueError("ATR mode requires historical data")))
+                            results.append(
+                                (price_or_error, ValueError("ATR mode requires historical data"))
+                            )
                             continue
                     elif use_mode == "trailing":
                         # Trailing mode: get high water mark from DB
@@ -378,7 +413,6 @@ def calculate(
                 "[italic yellow]Disclaimer: This tool is for educational purposes only and "
                 "does not constitute financial advice.[/italic yellow]"
             )
-
 
     except FileNotFoundError as e:
         console.print(f"[red]Error: {e}[/red]")

@@ -70,7 +70,9 @@ class PriceHistoryDB:
         records = []
         for date_val, row in history_df.iterrows():
             # Convert pandas Timestamp to date string
-            date_str = date_val.strftime("%Y-%m-%d") if hasattr(date_val, "strftime") else str(date_val)
+            date_str = (
+                date_val.strftime("%Y-%m-%d") if hasattr(date_val, "strftime") else str(date_val)
+            )
             records.append(
                 (
                     ticker.upper(),
@@ -149,7 +151,9 @@ class PriceHistoryDB:
 
         if since_date:
             query += " AND date >= ?"
-            date_str = since_date if isinstance(since_date, str) else since_date.strftime("%Y-%m-%d")
+            date_str = (
+                since_date if isinstance(since_date, str) else since_date.strftime("%Y-%m-%d")
+            )
             params = (ticker.upper(), date_str)
 
         with sqlite3.connect(self.db_path) as conn:
@@ -231,7 +235,9 @@ class PriceHistoryDB:
 
         if since_date:
             query += " AND date >= ?"
-            date_str = since_date if isinstance(since_date, str) else since_date.strftime("%Y-%m-%d")
+            date_str = (
+                since_date if isinstance(since_date, str) else since_date.strftime("%Y-%m-%d")
+            )
             params = (ticker.upper(), date_str)
 
         query += " ORDER BY date ASC"
@@ -270,9 +276,7 @@ class PriceHistoryDB:
                 raise ValueError(f"No historical data found for {ticker}")
 
             # Convert to DataFrame
-            df = pd.DataFrame(
-                rows, columns=["date", "Open", "High", "Low", "Close", "Volume"]
-            )
+            df = pd.DataFrame(rows, columns=["date", "Open", "High", "Low", "Close", "Volume"])
 
             # Convert date column to datetime and set as index
             df["date"] = pd.to_datetime(df["date"])
