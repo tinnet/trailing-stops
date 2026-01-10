@@ -313,3 +313,134 @@ def test_guidance_normal_behavior(
     # No SMA available
     result3 = calculator.calculate_simple(sample_stock_price, 5.0)
     assert result3.formatted_guidance == "N/A"
+
+
+# Tests for entry_price functionality
+
+
+def test_simple_with_entry_price(calculator: StopLossCalculator) -> None:
+    """Test simple stop-loss calculation includes entry price in result."""
+    stock_price = StockPrice(
+        ticker="AAPL",
+        current_price=150.0,
+        currency="USD",
+        timestamp=datetime.now(),
+        entry_price=140.0,
+    )
+
+    result = calculator.calculate_simple(stock_price, 5.0)
+
+    assert result.entry_price == 140.0
+    assert result.current_price == 150.0
+    assert result.stop_loss_price == pytest.approx(142.5)
+
+
+def test_simple_without_entry_price(calculator: StopLossCalculator, sample_stock_price: StockPrice) -> None:
+    """Test simple stop-loss without entry price (backward compatibility)."""
+    result = calculator.calculate_simple(sample_stock_price, 5.0)
+
+    assert result.entry_price is None
+
+
+def test_trailing_with_entry_price(calculator: StopLossCalculator) -> None:
+    """Test trailing stop-loss calculation includes entry price in result."""
+    stock_price = StockPrice(
+        ticker="AAPL",
+        current_price=150.0,
+        currency="USD",
+        timestamp=datetime.now(),
+        entry_price=140.0,
+    )
+
+    result = calculator.calculate_trailing(stock_price, 5.0)
+
+    assert result.entry_price == 140.0
+    assert result.stop_loss_type == StopLossType.TRAILING
+
+
+def test_atr_with_entry_price(calculator: StopLossCalculator) -> None:
+    """Test ATR stop-loss calculation includes entry price in result."""
+    stock_price = StockPrice(
+        ticker="AAPL",
+        current_price=150.0,
+        currency="USD",
+        timestamp=datetime.now(),
+        entry_price=140.0,
+    )
+
+    result = calculator.calculate_atr_stop_loss(stock_price, 5.0, atr=3.0, atr_multiplier=2.0)
+
+    assert result.entry_price == 140.0
+    assert result.stop_loss_type == StopLossType.ATR
+    assert result.stop_loss_price == pytest.approx(144.0)  # 150 - (3 * 2)
+
+
+def test_entry_price_in_result_persists(calculator: StopLossCalculator) -> None:
+    """Test that entry price flows through all calculation methods."""
+    stock_price = StockPrice(
+        ticker="AAPL",
+        current_price=150.0,
+        currency="USD",
+        timestamp=datetime.now(),
+        entry_price=145.0,
+    )
+
+    # Simple mode
+    result_simple = calculator.calculate_simple(stock_price, 5.0)
+    assert result_simple.entry_price == 145.0
+
+    # Trailing mode
+    result_trailing = calculator.calculate_trailing(stock_price, 5.0)
+    assert result_trailing.entry_price == 145.0
+
+    # ATR mode
+    result_atr = calculator.calculate_atr_stop_loss(stock_price, 5.0, atr=3.0)
+    assert result_atr.entry_price == 145.0
+
+
+def test_entry_price_does_not_affect_calculation(calculator: StopLossCalculator) -> None:
+    """Test that entry price is only for display and doesn't affect stop-loss calculation."""
+    # Two stock prices with different entry prices but same current price
+    stock_price_1 = StockPrice(
+        ticker="AAPL",
+        current_price=150.0,
+        currency="USD",
+        timestamp=datetime.now(),
+        entry_price=140.0,
+    )
+    stock_price_2 = StockPrice(
+        ticker="AAPL",
+        current_price=150.0,
+        currency="USD",
+        timestamp=datetime.now(),
+        entry_price=160.0,
+    )
+
+    result1 = calculator.calculate_simple(stock_price_1, 5.0)
+    result2 = calculator.calculate_simple(stock_price_2, 5.0)
+
+    # Stop-loss prices should be identical (based on current price, not entry)
+    assert result1.stop_loss_price == result2.stop_loss_price
+    # But entry prices in results should differ
+    assert result1.entry_price == 140.0
+    assert result2.entry_price == 160.0
+
+
+def test_entry_price_with_base_price(calculator: StopLossCalculator) -> None:
+    """Test that entry price in result is independent of base_price parameter."""
+    stock_price = StockPrice(
+        ticker="AAPL",
+        current_price=150.0,
+        currency="USD",
+        timestamp=datetime.now(),
+        entry_price=140.0,
+    )
+
+    # Use base_price (e.g., 52-week high mode)
+    result = calculator.calculate_simple(stock_price, 5.0, base_price=180.0)
+
+    # Entry price should still be preserved in result
+    assert result.entry_price == 140.0
+    # But calculation should use base_price
+    assert result.stop_loss_price == pytest.approx(171.0)  # 180 * 0.95
+    assert result.week_52_high == 180.0

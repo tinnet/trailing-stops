@@ -78,6 +78,49 @@ uv run stop-loss calculate --percentage 7.5
 uv run stop-loss calculate -p 10
 ```
 
+### Entry Price Support (Trailing Mode Only)
+
+Specify your entry price to set a floor for trailing stop-loss calculations based on your actual cost basis:
+
+```bash
+# CLI with entry prices (format: TICKER:PRICE) - requires --trailing
+uv run stop-loss calculate AAPL:150 GOOGL:2800 SHOP.TO:200 --trailing -p 5
+
+# Mixed format (some with entry prices, some without)
+uv run stop-loss calculate AAPL:150 NVDA --trailing  # NVDA uses database high water mark
+
+# Entry prices work only with trailing mode
+uv run stop-loss calculate AAPL:175.50 --trailing -p 5
+```
+
+**How it works in trailing mode:**
+- Entry price sets the **minimum high water mark** (`max(db_hwm, entry_price)`)
+- Ensures your stop never goes below your entry point
+- As price rises above entry, stop-loss trails normally
+- Mixed usage: Tickers without entry prices use database high water mark only
+
+**Why trailing mode only?**
+Entry prices represent your cost basis. Trailing mode naturally protects gains from that basis point forward, making the math intuitive. Simple and ATR modes calculate from current price, where entry price creates confusing "risk" calculations.
+
+**Example:**
+```bash
+$ uv run stop-loss calculate AAPL:180 --trailing -p 5
+
+# You bought at $180, stock went to $200, now at $195
+# High water mark = max($200 from DB, $180 entry) = $200
+# Stop-loss = $200 * 0.95 = $190
+# Risk = $195 - $190 = $5 per share
+```
+
+**Entry Price in Config:**
+```toml
+tickers = [
+    "AAPL:150.50",   # Entry price $150.50
+    "SHOP.TO:200",   # Entry price $200 CAD
+    "NVDA",          # No entry - uses current price
+]
+```
+
 ### Trailing Stop-Loss
 
 Enable trailing stop-loss (tracks high-water mark):

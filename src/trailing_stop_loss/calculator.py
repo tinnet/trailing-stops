@@ -31,6 +31,7 @@ class StopLossResult:
     atr_value: float | None = None  # ATR value (for ATR mode display)
     atr_multiplier: float | None = None  # ATR multiplier (for ATR mode display)
     week_52_high: float | None = None  # 52-week high (for display only)
+    entry_price: float | None = None  # User-provided entry price (for display only)
 
     @property
     def formatted_guidance(self) -> str:
@@ -118,6 +119,7 @@ class StopLossCalculator:
             dollar_risk=dollar_risk,
             sma_50=sma_50,
             week_52_high=base_price if base_price is not None else None,
+            entry_price=stock_price.entry_price,
         )
 
     def calculate_trailing(
@@ -173,6 +175,7 @@ class StopLossCalculator:
             dollar_risk=dollar_risk,
             sma_50=sma_50,
             week_52_high=None,
+            entry_price=stock_price.entry_price,
         )
 
     def calculate(
@@ -307,4 +310,5 @@ class StopLossCalculator:
             atr_value=atr,
             atr_multiplier=atr_multiplier,
             week_52_high=base_price if base_price is not None else None,
+            entry_price=stock_price.entry_price,
         )
