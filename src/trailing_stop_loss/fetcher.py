@@ -144,7 +144,9 @@ class PriceFetcher:
                 end_date = datetime.now().date()
 
             # Convert to string format expected by yfinance
-            start_str = start_date if isinstance(start_date, str) else start_date.strftime("%Y-%m-%d")
+            start_str = (
+                start_date if isinstance(start_date, str) else start_date.strftime("%Y-%m-%d")
+            )
             end_str = end_date if isinstance(end_date, str) else end_date.strftime("%Y-%m-%d")
 
             # Fetch historical data

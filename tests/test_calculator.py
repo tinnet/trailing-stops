@@ -136,12 +136,57 @@ def test_calculate_atr() -> None:
     """Test ATR calculation with known data."""
     # Create test data with known True Range values
     data = {
-        "High": [105.0, 107.0, 106.0, 108.0, 110.0, 109.0, 111.0, 112.0, 113.0, 114.0,
-                 115.0, 116.0, 117.0, 118.0, 119.0],
-        "Low": [99.0, 101.0, 100.0, 102.0, 104.0, 103.0, 105.0, 106.0, 107.0, 108.0,
-                109.0, 110.0, 111.0, 112.0, 113.0],
-        "Close": [103.0, 105.0, 104.0, 106.0, 108.0, 107.0, 109.0, 110.0, 111.0, 112.0,
-                  113.0, 114.0, 115.0, 116.0, 117.0],
+        "High": [
+            105.0,
+            107.0,
+            106.0,
+            108.0,
+            110.0,
+            109.0,
+            111.0,
+            112.0,
+            113.0,
+            114.0,
+            115.0,
+            116.0,
+            117.0,
+            118.0,
+            119.0,
+        ],
+        "Low": [
+            99.0,
+            101.0,
+            100.0,
+            102.0,
+            104.0,
+            103.0,
+            105.0,
+            106.0,
+            107.0,
+            108.0,
+            109.0,
+            110.0,
+            111.0,
+            112.0,
+            113.0,
+        ],
+        "Close": [
+            103.0,
+            105.0,
+            104.0,
+            106.0,
+            108.0,
+            107.0,
+            109.0,
+            110.0,
+            111.0,
+            112.0,
+            113.0,
+            114.0,
+            115.0,
+            116.0,
+            117.0,
+        ],
     }
     dates = pd.date_range("2024-01-01", periods=15)
     df = pd.DataFrame(data, index=dates)
@@ -283,9 +328,7 @@ def test_guidance_when_stop_above_current(
 ) -> None:
     """Test that guidance shows warning when stop-loss is above current price."""
     # Use 52-week high mode with high base price to create stop > current scenario
-    result = calculator.calculate_simple(
-        sample_stock_price, 5.0, sma_50=140.0, base_price=180.0
-    )
+    result = calculator.calculate_simple(sample_stock_price, 5.0, sma_50=140.0, base_price=180.0)
 
     # Stop-loss should be above current price
     assert result.stop_loss_price == pytest.approx(171.0)  # 180 * 0.95
